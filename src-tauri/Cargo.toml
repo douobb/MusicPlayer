@@ -1,0 +1,53 @@
+[package]
+name = "musicplayer"
+version = "0.1.4"
+description = "MusicPlayer - A local-first desktop media player"
+authors = ["you"]
+license = ""
+repository = ""
+edition = "2024"
+rust-version = "1.87"
+
+[lib]
+name = "musicplayer_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-dialog = "2"
+rodio = "0.22"
+lofty = "0.24"
+rusqlite = { version = "0.39", features = ["bundled"] }
+walkdir = "2.5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+thiserror = "2"
+trash = "5"
+notify = "8"
+
+[features]
+audio-tests = []
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+cast_precision_loss = "allow"
+cast_lossless = "allow"
+needless_pass_by_value = "allow"
+unwrap_used = "warn"
+clone_on_ref_ptr = "warn"

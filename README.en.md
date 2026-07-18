@@ -37,7 +37,7 @@ Further reading: [Why Rust](docs/why-rust.md), [Tauri 2 Introduction](docs/tauri
 | Metadata Parsing | lofty 0.24 | Read/write ID3/Vorbis/MP4 tags and cover art |
 | File Watching | notify 8 | Real-time folder change detection, automatic music library updates |
 | Database | SQLite (rusqlite, bundled) | WAL mode, schema migration management |
-| Testing | Vitest + cargo test | 17 frontend test files, 12 backend integration tests |
+| Testing | Vitest + cargo test | 25 frontend test files, 17 backend integration tests |
 
 ## Current Features
 
@@ -49,11 +49,17 @@ Further reading: [Why Rust](docs/why-rust.md), [Tauri 2 Introduction](docs/tauri
 
 **Mini Player + System Tray** -- Press `m` to switch to a compact 420x80 window (always-on-top). System tray supports Play/Pause, previous, next, show window, and quit. Closing the window automatically minimizes to the system tray.
 
-**Tauri 2 + Svelte 5 + Rust architecture** -- Frontend and backend communicate through 35 Tauri commands via IPC. The frontend manages state with Svelte 5 runes, while the backend handles audio decoding, file I/O, and database operations in Rust.
+**Tauri 2 + Svelte 5 + Rust architecture** -- Frontend and backend communicate through typed Tauri commands via IPC. The frontend manages state with Svelte 5 runes, while the backend handles audio decoding, file I/O, and database operations in Rust.
+
+**Tags and shared collection actions** -- Albums have been replaced by an internal multi-tag system. It supports creating, renaming, deleting, merging, and cleaning empty tags, plus per-track and multi-select batch editing. The track context menu organizes playlists and tags into searchable, scrollable second-level menus, with “All/Partial” assignment states for multi-selection. All Music, Artist, Tag, and playlist views share play-all, shuffle, add-to-queue, and add-to-playlist actions.
+
+**Multiple performers and original artists** -- Each track can store ordered lists of performers and original artists. Artists can be created, renamed, merged, and cleaned up, with works browsable by performer or original-artist role. Search, sorting, statistics, the player, and all track lists support multiple artists.
+
+**Settings and library folder management** -- A Settings entry in the sidebar manages multiple library folders, manual incremental rescans, pausing or resuming watchers, and whether indexed tracks are retained when a folder is removed. Startup synchronization catches changes made while the app was closed, while unavailable folders do not cause tracks to be removed accidentally. Rename, merge, and delete actions use consistent in-app dialogs; deletion confirmation is enabled by default and can be disabled in General settings.
 
 Other features:
-- Artist browse views (grid covers, search filtering, detail views)
-- Track metadata editing (title, artist, and other information written back to the file)
+- Artist and Tag browse views (search filtering, role-aware counts, and detail views)
+- Track metadata editing (title, multiple performers, and original artists written back to the file)
 - Real-time folder watching (add/modify/delete automatically syncs music library)
 - Column header sorting (preferences persisted), play count tracking (Most Played ranking view)
 - Recursive music library scanning with automatic metadata reading and cover art caching
@@ -85,9 +91,9 @@ Build artifacts are located in `src-tauri/target/release/bundle/`, supporting de
 ## Testing
 
 ```bash
-npm run test                    # Frontend unit tests (Vitest, 17 test files)
+npm run test                    # Frontend unit and component tests (Vitest, 25 test files)
 npm run check                   # Type checking
-cd src-tauri && cargo test      # Backend integration tests (12 test files, audio tests skipped by default)
+cd src-tauri && cargo test      # Backend integration tests (17 test files, audio tests skipped by default)
 cd src-tauri && cargo test --features audio-tests  # With audio tests (requires audio device)
 npm run quality                 # Code quality checks (ESLint + Prettier + Stylelint + Clippy + rustfmt)
 ```
@@ -122,8 +128,8 @@ All shortcuts are disabled when an input field is focused.
 ```
 src/                              # Frontend (Svelte 5 + TypeScript)
   lib/
-    api/                          # Tauri IPC call wrappers (playback, library, playlist)
-    components/                   # UI components (Player, Library, Browse, Playlist, Sidebar, Settings)
+    api/                          # Tauri IPC call wrappers (playback, library, playlist, tag)
+    components/                   # UI components (Player, Library, Browse, Tags, Playlist, Common)
     state/                        # Reactive state management (Svelte 5 runes)
     logic/                        # Pure function logic (playback modes, shortcuts, formatting, selection, sorting)
     types/                        # TypeScript type definitions
@@ -132,8 +138,8 @@ src-tauri/                        # Backend (Rust)
     audio/                        # Audio engine (rodio sink, gapless queue)
     scanner/                      # Folder scanning & file watching (walkdir, notify)
     metadata/                     # Metadata read/write & cover art caching (lofty)
-    storage/                      # SQLite database (schema v5, WAL mode)
-    commands/                     # Tauri command handlers (35 IPC interfaces)
-    models/                       # Data structure definitions (track, playlist, player_state)
-  tests/                          # 12 integration tests
+    storage/                      # SQLite database (schema v12, WAL mode)
+    commands/                     # Tauri command handlers
+    models/                       # Data structures (track, artist, tag, playlist, player_state)
+  tests/                          # 17 integration tests
 ```

@@ -1,6 +1,6 @@
-import { defineConfig } from 'vitest/config'
-import { svelte } from '@sveltejs/vite-plugin-svelte'
-import path from 'path'
+import { defineConfig } from 'vitest/config';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
+import path from 'path';
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -14,6 +14,7 @@ export default defineConfig({
     strictPort: true,
   },
   resolve: {
+    conditions: ['browser'],
     alias: {
       $lib: path.resolve('./src/lib'),
     },
@@ -23,4 +24,4 @@ export default defineConfig({
     globals: true,
     include: ['src/**/*.test.ts'],
   },
-})
+});

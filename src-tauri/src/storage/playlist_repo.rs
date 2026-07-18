@@ -1,6 +1,6 @@
 use rusqlite::{Connection, params};
 
-use super::library_repo::row_to_track;
+use super::library_repo::{hydrate_tracks, row_to_track};
 use crate::error::AppError;
 use crate::models::playlist::Playlist;
 use crate::models::track::Track;
@@ -81,17 +81,17 @@ fn get_playlist_track_ids(conn: &Connection, playlist_id: i64) -> Result<Vec<i64
 
 pub fn get_playlist_tracks(conn: &Connection, playlist_id: i64) -> Result<Vec<Track>, AppError> {
     let mut stmt = conn.prepare(
-        "SELECT t.id, t.file_path, t.title, t.artist, t.album, t.duration_secs, t.cover_art_path, t.file_size_bytes, t.play_count, t.last_played_at, t.album_artist
+        "SELECT t.id, t.file_path, t.title, t.duration_secs, t.cover_art_path, t.file_size_bytes, t.play_count, t.last_played_at
              FROM tracks t
              INNER JOIN playlist_tracks pt ON t.id = pt.track_id
              WHERE pt.playlist_id = ?1
              ORDER BY pt.sort_order",
     )?;
 
-    let tracks = stmt
+    let mut tracks = stmt
         .query_map(params![playlist_id], row_to_track)?
         .collect::<Result<Vec<_>, _>>()?;
-
+    hydrate_tracks(conn, &mut tracks)?;
     Ok(tracks)
 }
 

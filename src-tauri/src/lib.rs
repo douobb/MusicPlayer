@@ -69,23 +69,25 @@ fn init_watcher(
     ) {
         Ok(w) => w,
         Err(e) => {
-            eprintln!("[lyra] folder watcher unavailable, live library updates disabled: {e}");
+            eprintln!(
+                "[musicplayer] folder watcher unavailable, live library updates disabled: {e}"
+            );
             return None;
         }
     };
 
     match db_arc.lock() {
-        Ok(conn) => match storage::library_repo::get_all_scan_folders(&conn) {
+        Ok(conn) => match storage::folder_repo::get_enabled_paths(&conn) {
             Ok(folders) => {
                 for folder in folders {
                     if let Err(e) = watcher.watch(&folder) {
-                        eprintln!("[lyra] failed to watch folder {folder}: {e}");
+                        eprintln!("[musicplayer] failed to watch folder {folder}: {e}");
                     }
                 }
             }
-            Err(e) => eprintln!("[lyra] failed to load scan folders for watching: {e}"),
+            Err(e) => eprintln!("[musicplayer] failed to load scan folders for watching: {e}"),
         },
-        Err(e) => eprintln!("[lyra] failed to lock db while starting watcher: {e}"),
+        Err(e) => eprintln!("[musicplayer] failed to lock db while starting watcher: {e}"),
     }
 
     Some(watcher)
@@ -136,7 +138,6 @@ pub fn run() {
             commands::playback::get_player_state,
             commands::playback::queue_next_track,
             // Library commands
-            commands::library::scan_folder,
             commands::library::get_all_tracks,
             commands::library::get_track_cover,
             commands::library::search_tracks,
@@ -147,15 +148,33 @@ pub fn run() {
             commands::library::get_track_details,
             commands::library::import_paths,
             commands::library::update_track_metadata,
+            commands::library::create_artist,
+            commands::library::rename_artist,
+            commands::library::merge_artists,
+            commands::library::delete_unused_artists,
             commands::library::get_all_artists,
-            commands::library::get_all_albums,
             commands::library::get_tracks_by_artist,
-            commands::library::get_tracks_by_album,
             commands::library::increment_play_count,
             commands::library::get_most_played_tracks,
-            commands::library::start_watching,
-            commands::library::stop_watching,
-            commands::library::get_watched_folders,
+            commands::library::get_library_folders,
+            commands::library::add_library_folder,
+            commands::library::rescan_library_folder,
+            commands::library::rescan_all_library_folders,
+            commands::library::set_library_folder_watching,
+            commands::library::remove_library_folder,
+            commands::library::open_library_folder,
+            // Tag commands
+            commands::tag::create_tag,
+            commands::tag::rename_tag,
+            commands::tag::delete_tag,
+            commands::tag::delete_empty_tags,
+            commands::tag::merge_tags,
+            commands::tag::get_all_tags,
+            commands::tag::get_tags_for_track,
+            commands::tag::get_tag_assignments_for_tracks,
+            commands::tag::add_tags_to_tracks,
+            commands::tag::remove_tags_from_tracks,
+            commands::tag::get_tracks_by_tag,
             // Playlist commands
             commands::playlist::create_playlist,
             commands::playlist::rename_playlist,

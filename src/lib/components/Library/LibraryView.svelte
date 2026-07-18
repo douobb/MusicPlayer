@@ -2,12 +2,13 @@
   import type { Track, TrackDetails, SortColumn } from '$lib/types';
   import TrackList from './TrackList.svelte';
   import TrackPropertiesDialog from './TrackPropertiesDialog.svelte';
+  import CollectionToolbar from '../Common/CollectionToolbar.svelte';
   import StatusBar from './StatusBar.svelte';
   import { getLibraryState } from '$lib/state/libraryState.svelte';
   import { getPlayerState } from '$lib/state/playerState.svelte';
   import * as libraryApi from '$lib/api/library';
   import { filterTracks } from '$lib/logic/format';
-  import { startPlayingTrack } from '$lib/logic/playback-actions';
+  import { playCollectionTrack } from '$lib/logic/collection-actions';
   import { optimisticTrash, optimisticRemove } from '$lib/logic/track-actions';
   import { notifyCritical } from '$lib/logic/error-handler';
   import { sortTracks, toggleSort, loadSortConfig, saveSortConfig } from '$lib/logic/sorting';
@@ -29,7 +30,7 @@
   let propertiesDetails = $state<TrackDetails | null>(null);
 
   async function handlePlay(track: Track) {
-    await startPlayingTrack(track, sortedTracks);
+    await playCollectionTrack(track, sortedTracks);
   }
 
   async function handleRemove(tracksToRemove: Track[]) {
@@ -49,21 +50,25 @@
     }
   }
 
-  async function handleSaveMetadata(update: { title: string; artist: string; album: string }) {
+  async function handleSaveMetadata(update: {
+    title: string;
+    performers: string[];
+    originalPerformers: string[];
+  }) {
     if (!propertiesDetails) return;
     try {
       const updated = await libraryApi.updateTrackMetadata(
         propertiesDetails.id,
         update.title,
-        update.artist,
-        update.album,
+        update.performers,
+        update.originalPerformers,
       );
       library.allTracks = library.allTracks.map((t) => (t.id === updated.id ? updated : t));
       propertiesDetails = {
         ...propertiesDetails,
         title: update.title,
-        artist: update.artist,
-        album: update.album,
+        performers: updated.performers,
+        original_performers: updated.original_performers,
       };
       if (player.currentTrack?.id === updated.id) {
         player.currentTrack = updated;
@@ -99,6 +104,7 @@
     </div>
   </div>
 
+  <CollectionToolbar tracks={sortedTracks} />
   <TrackList
     tracks={sortedTracks}
     currentTrackId={player.currentTrack?.id ?? null}

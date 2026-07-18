@@ -1,6 +1,24 @@
 mod common;
 
+use std::path::Path;
 use std::time::Duration;
+
+fn create_dir_symlink(target: impl AsRef<Path>, link: impl AsRef<Path>) -> bool {
+    #[cfg(unix)]
+    let result = std::os::unix::fs::symlink(target, link);
+
+    #[cfg(windows)]
+    let result = std::os::windows::fs::symlink_dir(target, link);
+
+    match result {
+        Ok(()) => true,
+        Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
+            eprintln!("略過測試：目前 Windows 環境不允許建立目錄符號連結");
+            false
+        }
+        Err(error) => panic!("建立目錄符號連結失敗: {error}"),
+    }
+}
 
 use musicplayer_lib::scanner::folder_scanner;
 
@@ -19,7 +37,9 @@ fn test_scan_folder_with_symlink_cycle_does_not_hang() {
 
     // Create a symlink cycle: subdir/link -> root
     let link = sub.join("link_to_root");
-    std::os::unix::fs::symlink(root, &link).unwrap();
+    if !create_dir_symlink(root, &link) {
+        return;
+    }
 
     // Place an audio file in root
     std::fs::write(root.join("song.mp3"), b"fake mp3").unwrap();
@@ -57,7 +77,9 @@ fn test_scan_folder_with_deep_symlink_cycle() {
 
     // Symlink c/link -> a (creates a cycle)
     let link = c.join("link_to_a");
-    std::os::unix::fs::symlink(&a, &link).unwrap();
+    if !create_dir_symlink(&a, &link) {
+        return;
+    }
 
     // Place audio files at different levels
     std::fs::write(a.join("level1.flac"), b"fake").unwrap();
@@ -104,9 +126,13 @@ fn test_scan_folder_with_mutual_symlink_cycle() {
     std::fs::create_dir(&dir_b).unwrap();
 
     // dir_a/link_b -> dir_b
-    std::os::unix::fs::symlink(&dir_b, dir_a.join("link_b")).unwrap();
+    if !create_dir_symlink(&dir_b, dir_a.join("link_b")) {
+        return;
+    }
     // dir_b/link_a -> dir_a
-    std::os::unix::fs::symlink(&dir_a, dir_b.join("link_a")).unwrap();
+    if !create_dir_symlink(&dir_a, dir_b.join("link_a")) {
+        return;
+    }
 
     // Place audio files in each directory
     std::fs::write(dir_a.join("a.mp3"), b"fake").unwrap();
@@ -146,7 +172,9 @@ fn test_scan_folder_with_self_referencing_symlink() {
 
     // Create a symlink that points to itself
     let self_link = root.join("self_link");
-    std::os::unix::fs::symlink(&self_link, &self_link).unwrap();
+    if !create_dir_symlink(&self_link, &self_link) {
+        return;
+    }
 
     // Place an audio file in root
     std::fs::write(root.join("track.mp3"), b"fake mp3").unwrap();
@@ -171,7 +199,9 @@ fn test_scan_folder_with_broken_symlink() {
 
     // Create a symlink pointing to a nonexistent target
     let broken_link = root.join("broken_link");
-    std::os::unix::fs::symlink("/nonexistent/target/dir", &broken_link).unwrap();
+    if !create_dir_symlink("/nonexistent/target/dir", &broken_link) {
+        return;
+    }
 
     // Place an audio file in root
     std::fs::write(root.join("valid.flac"), b"fake flac").unwrap();
@@ -201,7 +231,9 @@ fn test_scan_folder_valid_symlink_no_cycle() {
 
     // Create a symlink to the target (no cycle)
     let link = root.join("music_link");
-    std::os::unix::fs::symlink(&target, &link).unwrap();
+    if !create_dir_symlink(&target, &link) {
+        return;
+    }
 
     let result = folder_scanner::scan_folder(root.to_str().unwrap());
     assert!(result.is_ok());

@@ -4,10 +4,11 @@ type ActiveView =
   | { kind: 'library' }
   | { kind: 'playlist'; playlistId: number }
   | { kind: 'artists' }
-  | { kind: 'artist-detail'; artistName: string }
-  | { kind: 'albums' }
-  | { kind: 'album-detail'; albumName: string; artistName: string }
-  | { kind: 'most-played' };
+  | { kind: 'artist-detail'; artistId: number; artistName: string }
+  | { kind: 'tags' }
+  | { kind: 'tag-detail'; tagId: number; tagName: string }
+  | { kind: 'most-played' }
+  | { kind: 'settings' };
 
 let playlists = $state<Playlist[]>([]);
 let activeView = $state<ActiveView>({ kind: 'library' });

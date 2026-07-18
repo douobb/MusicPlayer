@@ -1,10 +1,10 @@
 <script lang="ts">
-  import FolderPicker from '../Settings/FolderPicker.svelte';
   import { getPlaylistState } from '$lib/state/playlistState.svelte';
   import * as playlistApi from '$lib/api/playlist';
   import { notifyCritical, warnNonCritical } from '$lib/logic/error-handler';
   import { moveByKeyboard } from '$lib/logic/reorder';
   import { tick, untrack } from 'svelte';
+  import { askConfirmation } from '$lib/state/dialogState.svelte';
 
   let { onshowshortcuts }: { onshowshortcuts?: () => void } = $props();
 
@@ -45,12 +45,16 @@
     playlistState.activeView = { kind: 'artists' };
   }
 
-  function goToAlbums() {
-    playlistState.activeView = { kind: 'albums' };
+  function goToTags() {
+    playlistState.activeView = { kind: 'tags' };
   }
 
   function goToMostPlayed() {
     playlistState.activeView = { kind: 'most-played' };
+  }
+
+  function goToSettings() {
+    playlistState.activeView = { kind: 'settings' };
   }
 
   async function createNewPlaylist() {
@@ -110,6 +114,17 @@
   }
 
   async function handleDeletePlaylist(id: number) {
+    const playlist = playlistState.playlists.find((item) => item.id === id);
+    if (
+      !(await askConfirmation({
+        title: `刪除播放清單「${playlist?.name ?? '未命名'}」？`,
+        message: '播放清單會被刪除，但其中的曲目仍會保留在媒體庫。',
+        confirmLabel: '刪除',
+        danger: true,
+        destructive: true,
+      }))
+    )
+      return;
     try {
       await playlistApi.deletePlaylist(id);
       const lists = await playlistApi.getAllPlaylists();
@@ -292,16 +307,16 @@
     </button>
     <button
       class="nav-item"
-      class:active={playlistState.activeView.kind === 'albums' ||
-        playlistState.activeView.kind === 'album-detail'}
-      onclick={goToAlbums}
+      class:active={playlistState.activeView.kind === 'tags' ||
+        playlistState.activeView.kind === 'tag-detail'}
+      onclick={goToTags}
     >
       <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
         <path
-          d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"
+          d="M17.63 5.84C17.27 5.33 16.67 5 16 5H5c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h11c.67 0 1.27-.33 1.63-.84L22 12l-4.37-6.16zM16 17H5V7h11l3.55 5L16 17z"
         />
       </svg>
-      Albums
+      Tags
     </button>
     <button
       class="nav-item"
@@ -420,7 +435,18 @@
         快捷鍵
       </button>
     {/if}
-    <FolderPicker />
+    <button
+      class="shortcuts-btn"
+      class:active={playlistState.activeView.kind === 'settings'}
+      onclick={goToSettings}
+    >
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"
+        ><path
+          d="M19.14 12.94a7.49 7.49 0 000-1.88l2.03-1.58-1.92-3.32-2.39.96a7.2 7.2 0 00-1.63-.94L14.87 3h-3.84l-.36 3.18c-.58.24-1.12.55-1.63.94l-2.39-.96-1.92 3.32 2.03 1.58a7.49 7.49 0 000 1.88l-2.03 1.58 1.92 3.32 2.39-.96c.51.39 1.05.7 1.63.94l.36 3.18h3.84l.36-3.18c.58-.24 1.12-.55 1.63-.94l2.39.96 1.92-3.32-2.03-1.58zM12.95 15.5a3.5 3.5 0 110-7 3.5 3.5 0 010 7z"
+        /></svg
+      >
+      設定
+    </button>
   </div>
 </aside>
 

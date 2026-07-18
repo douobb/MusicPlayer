@@ -10,6 +10,7 @@ use lofty::probe::Probe;
 use lofty::tag::{Accessor, ItemKey};
 
 use crate::error::AppError;
+use crate::models::artist::ArtistCredit;
 use crate::models::track::{Track, TrackDetails};
 
 /// Read a tagged file in Relaxed mode: invalid tag items (e.g. `ID3v2` timestamp
@@ -20,6 +21,31 @@ fn read_tagged_file(path: &Path) -> lofty::error::Result<TaggedFile> {
     Probe::open(path)?.options(options).read()
 }
 
+#[allow(clippy::cast_possible_wrap)]
+fn credits_from_names(names: Vec<String>) -> Vec<ArtistCredit> {
+    names
+        .into_iter()
+        .enumerate()
+        .filter_map(|(position, name)| {
+            let name = name.trim().to_string();
+            if name.is_empty() {
+                return None;
+            }
+            Some(ArtistCredit {
+                artist_id: 0,
+                name,
+                position: position as i64,
+            })
+        })
+        .collect()
+}
+
+fn read_artist_names(tag: &lofty::tag::Tag, key: ItemKey) -> Vec<String> {
+    tag.get_strings(key)
+        .flat_map(|value| value.split('\0'))
+        .map(ToString::to_string)
+        .collect()
+}
 pub fn read_metadata(file_path: &str) -> Result<Track, AppError> {
     let path = Path::new(file_path);
 
@@ -41,37 +67,39 @@ pub fn read_metadata(file_path: &str) -> Result<Track, AppError> {
                 .primary_tag()
                 .or_else(|| tagged_file.first_tag());
 
-            let (title, artist, album, album_artist) = match tag {
-                Some(t) => {
-                    let title = t.title().map_or(fallback_title, |s| s.to_string());
-                    let artist = t
-                        .artist()
-                        .map_or_else(|| "Unknown Artist".to_string(), |s| s.to_string());
-                    let album = t
-                        .album()
-                        .map_or_else(|| "Unknown Album".to_string(), |s| s.to_string());
-                    let album_artist = t
-                        .get_string(ItemKey::AlbumArtist)
-                        .map(str::trim)
-                        .filter(|s| !s.is_empty())
-                        .map(ToString::to_string);
-                    (title, artist, album, album_artist)
+            let (title, performers, original_performers) = match tag {
+                Some(tag) => {
+                    let mut performers = read_artist_names(tag, ItemKey::TrackArtists);
+                    if performers.is_empty() {
+                        performers = read_artist_names(tag, ItemKey::TrackArtist);
+                    }
+                    if performers.is_empty() {
+                        if let Some(value) = tag.artist() {
+                            performers.push(value.to_string());
+                        }
+                    }
+                    if performers.is_empty() {
+                        performers.push("Unknown Artist".to_string());
+                    }
+                    (
+                        tag.title()
+                            .map_or(fallback_title, |value| value.to_string()),
+                        credits_from_names(performers),
+                        credits_from_names(read_artist_names(tag, ItemKey::OriginalArtist)),
+                    )
                 }
                 None => (
                     fallback_title,
-                    "Unknown Artist".to_string(),
-                    "Unknown Album".to_string(),
-                    None,
+                    credits_from_names(vec!["Unknown Artist".to_string()]),
+                    Vec::new(),
                 ),
             };
-
             Ok(Track {
                 id: 0,
                 file_path: file_path.to_string(),
                 title,
-                artist,
-                album,
-                album_artist,
+                performers,
+                original_performers,
                 duration_secs,
                 cover_art: None,
                 cover_art_path: None,
@@ -84,7 +112,7 @@ pub fn read_metadata(file_path: &str) -> Result<Track, AppError> {
             // Last-resort fallback for tags even Relaxed mode cannot parse:
             // skip tag reading and use only audio properties + filename.
             eprintln!(
-                "[lyra] Tag parsing failed for {file_path}: {e}; \
+                "[musicplayer] Tag parsing failed for {file_path}: {e}; \
                  retrying without tags"
             );
 
@@ -99,9 +127,8 @@ pub fn read_metadata(file_path: &str) -> Result<Track, AppError> {
                 id: 0,
                 file_path: file_path.to_string(),
                 title: fallback_title,
-                artist: "Unknown Artist".to_string(),
-                album: "Unknown Album".to_string(),
-                album_artist: None,
+                performers: credits_from_names(vec!["Unknown Artist".to_string()]),
+                original_performers: Vec::new(),
                 duration_secs,
                 cover_art: None,
                 cover_art_path: None,
@@ -138,8 +165,8 @@ pub fn read_track_details(file_path: &str, track: &Track) -> Result<TrackDetails
         id: track.id,
         file_path: track.file_path.clone(),
         title: track.title.clone(),
-        artist: track.artist.clone(),
-        album: track.album.clone(),
+        performers: track.performers.clone(),
+        original_performers: track.original_performers.clone(),
         duration_secs: track.duration_secs,
         file_size_bytes,
         bitrate_kbps,
@@ -201,7 +228,7 @@ pub fn save_cover_art(
 pub fn remove_cover_art_file(cover_art_path: &str) {
     if let Err(e) = fs::remove_file(cover_art_path) {
         if e.kind() != std::io::ErrorKind::NotFound {
-            eprintln!("[lyra] failed to remove cover art {cover_art_path}: {e}");
+            eprintln!("[musicplayer] failed to remove cover art {cover_art_path}: {e}");
         }
     }
 }

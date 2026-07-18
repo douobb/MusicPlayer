@@ -48,26 +48,26 @@ describe('filterTracks', () => {
     createMockTrack({
       id: 1,
       title: 'Bohemian Rhapsody',
-      artist: 'Queen',
-      album: 'A Night at the Opera',
+      performers: [{ artist_id: 1, name: 'Queen', position: 0 }],
+      original_performers: [],
     }),
     createMockTrack({
       id: 2,
       title: 'Stairway to Heaven',
-      artist: 'Led Zeppelin',
-      album: 'Led Zeppelin IV',
+      performers: [{ artist_id: 1, name: 'Led Zeppelin', position: 0 }],
+      original_performers: [],
     }),
     createMockTrack({
       id: 3,
       title: 'Hotel California',
-      artist: 'Eagles',
-      album: 'Hotel California',
+      performers: [{ artist_id: 1, name: 'Eagles', position: 0 }],
+      original_performers: [],
     }),
     createMockTrack({
       id: 4,
       title: 'Sweet Child O Mine',
-      artist: 'Guns N Roses',
-      album: 'Appetite for Destruction',
+      performers: [{ artist_id: 1, name: 'Guns N Roses', position: 0 }],
+      original_performers: [],
     }),
   ];
 
@@ -88,17 +88,11 @@ describe('filterTracks', () => {
   it('matches by artist', () => {
     const result = filterTracks(tracks, 'queen');
     expect(result).toHaveLength(1);
-    expect(result[0].artist).toBe('Queen');
-  });
-
-  it('matches by album', () => {
-    const result = filterTracks(tracks, 'appetite');
-    expect(result).toHaveLength(1);
-    expect(result[0].album).toBe('Appetite for Destruction');
+    expect(result[0].performers[0].name).toBe('Queen');
   });
 
   it('matches across multiple fields', () => {
-    // "Hotel California" appears in both title and album of track 3
+    // 標題符合查詢
     const result = filterTracks(tracks, 'hotel');
     expect(result).toHaveLength(1);
   });

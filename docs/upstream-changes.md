@@ -2,7 +2,7 @@
 
 MusicPlayer 基於 [twtrubiks/lyra-music](https://github.com/twtrubiks/lyra-music) 開發，保留其 Tauri、Svelte、Rust 與 SQLite 架構，以及 MIT 授權。
 
-以下項目為本專案相較上游的主要方向，尚未完成的功能仍屬規劃。
+以下整理本專案已完成的核心差異與後續產品方向。
 
 ## 核心功能比較
 
@@ -14,6 +14,8 @@ MusicPlayer 基於 [twtrubiks/lyra-music](https://github.com/twtrubiks/lyra-musi
 | 離線媒體庫與播放清單 | ✅ | ✅ | ✅ |
 | Album 瀏覽與管理 | ✅ | ❌ | ❌ |
 | 多 Tag 分類 | ❌ | ✅ | ✅ |
+| 多人演唱者與原唱 | ❌ | ✅ | ✅ |
+| 多資料夾管理與增量同步 | ❌ | ✅ | ✅ |
 | Artist / Tag 播放操作 | ⚠️ | ✅ | ✅ |
 | Mini Player 與 System Tray | ✅ | ✅ | ✅ |
 | Windows 工作列播放器 | ❌ | ✅ | ✅ |
@@ -32,8 +34,12 @@ MusicPlayer 基於 [twtrubiks/lyra-music](https://github.com/twtrubiks/lyra-musi
 ## 兩個版本的共用差異
 
 - 移除 Album 瀏覽與管理功能，改為可讓同一媒體擁有多個分類的 Tag 系統。
+- 曲目右鍵選單將播放清單與 Tag 收納為可搜尋、可捲動的第二層選單，並支援多選曲目的完整／部分 Tag 狀態。
+- 支援每首曲目依序標註多位演唱者與原唱，並可依角色瀏覽、搜尋及管理 Artist。
+- 新增設定頁與多個媒體庫資料夾管理，支援增量重掃、監看切換、啟動同步及失聯保護。
+- 以一致的應用程式內建彈框處理輸入與破壞性操作確認，並可在設定中關閉刪除確認。
 - 擴充 Artist 與 Tag 的播放、隨機播放、加入佇列及播放清單操作。
-- 新增 Windows 工作列播放器，提供精簡的播放資訊與控制。
+- 規劃新增 Windows 工作列播放器，提供精簡的播放資訊與控制。
 - 保留播放清單、Mini Player、System Tray 與輕量背景播放能力。
 
 ## Lite 版
@@ -45,6 +51,6 @@ MusicPlayer 基於 [twtrubiks/lyra-music](https://github.com/twtrubiks/lyra-musi
 ## 完整版
 
 - 包含 Lite 版所有功能。
-- 支援 MP4 視訊播放，並可由使用者選擇是否顯示畫面。
-- 支援可開關的動態音樂波形。
-- 支援 YouTube 單一影片與播放清單下載，並可匯入媒體庫。
+- 規劃支援 MP4 視訊播放，並可由使用者選擇是否顯示畫面。
+- 規劃支援可開關的動態音樂波形。
+- 規劃支援 YouTube 單一影片與播放清單下載，並可匯入媒體庫。

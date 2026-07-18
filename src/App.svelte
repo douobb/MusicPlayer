@@ -1,14 +1,9 @@
 <script lang="ts">
   import Sidebar from '$lib/components/Sidebar/Sidebar.svelte';
-  import LibraryView from '$lib/components/Library/LibraryView.svelte';
-  import PlaylistPanel from '$lib/components/Playlist/PlaylistPanel.svelte';
+  import MainView from '$lib/components/MainView.svelte';
   import PlayerBar from '$lib/components/Player/PlayerBar.svelte';
-  import ArtistListView from '$lib/components/Browse/ArtistListView.svelte';
-  import ArtistDetailView from '$lib/components/Browse/ArtistDetailView.svelte';
-  import AlbumListView from '$lib/components/Browse/AlbumListView.svelte';
-  import AlbumDetailView from '$lib/components/Browse/AlbumDetailView.svelte';
-  import MostPlayedView from '$lib/components/Browse/MostPlayedView.svelte';
-  import { getPlaylistState } from '$lib/state/playlistState.svelte';
+  import DialogHost from '$lib/components/Common/DialogHost.svelte';
+
   import { getPlayerState } from '$lib/state/playerState.svelte';
   import ErrorNotification from '$lib/components/ErrorNotification.svelte';
   import KeyboardShortcutsDialog from '$lib/components/Help/KeyboardShortcutsDialog.svelte';
@@ -29,7 +24,6 @@
   import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
   import { listen } from '@tauri-apps/api/event';
 
-  const playlistState = getPlaylistState();
   const player = getPlayerState();
   const library = getLibraryState();
 
@@ -68,7 +62,7 @@
             isDragOver = false;
             draggedPathCount = 0;
             if (payload.paths.length === 0) {
-              console.warn('[lyra] Drop event received but paths array is empty');
+              console.warn('[musicplayer] Drop event received but paths array is empty');
               pushError('Drop event received but no file paths were provided', 'warn');
               return;
             }
@@ -79,7 +73,10 @@
           }
         });
       } catch (err) {
-        console.warn('[lyra] Tauri onDragDropEvent not available, using HTML5 fallback:', err);
+        console.warn(
+          '[musicplayer] Tauri onDragDropEvent not available, using HTML5 fallback:',
+          err,
+        );
       }
     })();
     return () => {
@@ -187,6 +184,17 @@
     };
   });
 
+  // 啟動後執行快速增量同步，補回程式關閉期間的資料夾變更。
+  $effect(() => {
+    (async () => {
+      try {
+        await libraryApi.rescanAllLibraryFolders();
+        library.allTracks = await libraryApi.getAllTracks();
+      } catch (error) {
+        warnNonCritical('Startup library sync', error);
+      }
+    })();
+  });
   // HTML5 drag-drop fallback (for Linux/WebKitGTK where Tauri native events may not fire)
   function handleHtml5DragOver(e: DragEvent) {
     if (tauriDragDropActive) return;
@@ -217,7 +225,7 @@
     if (paths.length > 0) {
       await importDroppedPaths(paths);
     } else {
-      console.warn('[lyra] HTML5 drop: no file:// URIs found in dataTransfer');
+      console.warn('[musicplayer] HTML5 drop: no file:// URIs found in dataTransfer');
       pushError('Could not read dropped file paths. Try using Scan Folder instead.', 'warn');
     }
   }
@@ -326,24 +334,7 @@
   </div>
 
   <div class="main-area">
-    {#if playlistState.activeView.kind === 'library'}
-      <LibraryView />
-    {:else if playlistState.activeView.kind === 'artists'}
-      <ArtistListView />
-    {:else if playlistState.activeView.kind === 'artist-detail'}
-      <ArtistDetailView artistName={playlistState.activeView.artistName} />
-    {:else if playlistState.activeView.kind === 'albums'}
-      <AlbumListView />
-    {:else if playlistState.activeView.kind === 'album-detail'}
-      <AlbumDetailView
-        albumName={playlistState.activeView.albumName}
-        artistName={playlistState.activeView.artistName}
-      />
-    {:else if playlistState.activeView.kind === 'most-played'}
-      <MostPlayedView />
-    {:else}
-      <PlaylistPanel />
-    {/if}
+    <MainView />
   </div>
 
   <div class="player-area">
@@ -367,6 +358,7 @@
   {/if}
 
   <ErrorNotification />
+  <DialogHost />
 
   {#if showShortcutsDialog}
     <KeyboardShortcutsDialog onclose={() => (showShortcutsDialog = false)} />

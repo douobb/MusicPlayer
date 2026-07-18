@@ -2,11 +2,12 @@
   import type { Track, TrackDetails } from '$lib/types';
   import TrackList from '../Library/TrackList.svelte';
   import TrackPropertiesDialog from '../Library/TrackPropertiesDialog.svelte';
+  import CollectionToolbar from '../Common/CollectionToolbar.svelte';
   import StatusBar from '../Library/StatusBar.svelte';
   import { getPlayerState } from '$lib/state/playerState.svelte';
   import { getLibraryState } from '$lib/state/libraryState.svelte';
   import * as libraryApi from '$lib/api/library';
-  import { startPlayingTrack } from '$lib/logic/playback-actions';
+  import { playCollectionTrack } from '$lib/logic/collection-actions';
   import { optimisticTrash, optimisticRemove } from '$lib/logic/track-actions';
   import { notifyCritical } from '$lib/logic/error-handler';
 
@@ -20,7 +21,7 @@
   let propertiesDetails = $state<TrackDetails | null>(null);
 
   async function handlePlay(track: Track) {
-    await startPlayingTrack(track, tracks);
+    await playCollectionTrack(track, tracks);
   }
 
   async function handleRemove(tracksToRemove: Track[]) {
@@ -50,22 +51,26 @@
     }
   }
 
-  async function handleSaveMetadata(update: { title: string; artist: string; album: string }) {
+  async function handleSaveMetadata(update: {
+    title: string;
+    performers: string[];
+    originalPerformers: string[];
+  }) {
     if (!propertiesDetails) return;
     try {
       const updated = await libraryApi.updateTrackMetadata(
         propertiesDetails.id,
         update.title,
-        update.artist,
-        update.album,
+        update.performers,
+        update.originalPerformers,
       );
       tracks = tracks.map((t) => (t.id === updated.id ? updated : t));
       library.allTracks = library.allTracks.map((t) => (t.id === updated.id ? updated : t));
       propertiesDetails = {
         ...propertiesDetails,
         title: update.title,
-        artist: update.artist,
-        album: update.album,
+        performers: updated.performers,
+        original_performers: updated.original_performers,
       };
       if (player.currentTrack?.id === updated.id) {
         player.currentTrack = updated;
@@ -103,6 +108,7 @@
   {:else if tracks.length === 0}
     <div class="empty"><p>No play history yet. Start listening!</p></div>
   {:else}
+    <CollectionToolbar {tracks} />
     <TrackList
       {tracks}
       currentTrackId={player.currentTrack?.id ?? null}

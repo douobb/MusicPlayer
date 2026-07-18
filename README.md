@@ -37,7 +37,7 @@ MusicPlayer 尚未提供正式發佈版本。
 | 元資料解析 | lofty 0.24 | 讀寫 ID3/Vorbis/MP4 標籤與封面圖 |
 | 檔案監視 | notify 8 | 即時偵測資料夾變化，自動更新音樂庫 |
 | 資料庫 | SQLite (rusqlite, bundled) | WAL mode，schema migration 管理 |
-| 測試 | Vitest + cargo test | 前端 17 個測試檔、後端 12 個整合測試 |
+| 測試 | Vitest + cargo test | 前端 25 個測試檔、後端 17 個整合測試 |
 
 ## 目前功能
 
@@ -49,12 +49,18 @@ MusicPlayer 尚未提供正式發佈版本。
 
 **Mini Player + System Tray** -- 按 `m` 切換為 420x80 精簡視窗（always-on-top）。系統匣支援 Play/Pause、上一首、下一首、顯示視窗、退出。關閉視窗時自動最小化到系統匣。
 
-**Tauri 2 + Svelte 5 + Rust 架構** -- 前後端透過 35 個 Tauri commands 進行 IPC 通訊。前端以 Svelte 5 runes 管理狀態，後端以 Rust 處理音訊解碼、檔案 I/O、資料庫操作。
+**Tauri 2 + Svelte 5 + Rust 架構** -- 前後端透過型別化的 Tauri commands 進行 IPC 通訊。前端以 Svelte 5 runes 管理狀態，後端以 Rust 處理音訊解碼、檔案 I/O、資料庫操作。
+
+**Tag 分類與共用播放操作** -- Album 已改為可讓同一曲目擁有多個分類的 Tag 系統，支援建立、重新命名、刪除、合併、清理空 Tag、單曲與多選批次編輯。曲目右鍵選單將播放清單與 Tag 收納至可搜尋、可捲動的第二層選單，多選時以「全部／部分」標示 Tag 套用狀態。All Music、Artist、Tag 與播放清單共用播放全部、隨機播放、加入佇列及加入播放清單操作。
+
+**多人演唱者與原唱** -- 每首曲目可依順序標註多位演唱者及多位原唱；Artist 支援建立、重新命名、合併與清理，並可依演唱／原唱角色瀏覽作品。搜尋、排序、統計、播放器及各曲目列表皆支援多人資訊。
+
+**設定與媒體庫資料夾管理** -- 側邊欄提供設定入口，可管理多個媒體庫資料夾、手動增量重新掃描、暫停／恢復監看，以及選擇移除資料夾時是否保留索引曲目。啟動時會快速同步停機期間的變更，無法存取的資料夾不會造成曲目被誤刪。重新命名、合併與刪除操作使用一致的應用程式內建彈框，刪除確認預設開啟，亦可在一般設定關閉。
 
 其他功能：
-- 藝人瀏覽視圖（網格封面、搜尋過濾、詳情視圖）
-- 曲目元資料編輯（標題、藝人等資訊寫回檔案）
-- 資料夾即時監視（新增/修改/刪除自動同步音樂庫）
+- Artist 與 Tag 瀏覽視圖（搜尋過濾、角色統計、詳情視圖）
+- 曲目元資料編輯（標題、多人演唱者與原唱資訊寫回檔案）
+- 資料夾即時監視（新增／修改／刪除自動同步媒體庫）
 - 欄標題排序（偏好持久化）、播放計數追蹤（Most Played 排行視圖）
 - 音樂庫遞迴掃描，自動讀取 metadata 與封面快取
 - 播放模式（循環/單曲/隨機）、即時搜尋過濾、多選操作、右鍵選單、拖放匯入
@@ -85,9 +91,9 @@ npm run tauri build   # 正式建置
 ## 測試
 
 ```bash
-npm run test                    # 前端單元測試 (Vitest, 17 個測試檔)
+npm run test                    # 前端單元與元件測試 (Vitest, 25 個測試檔)
 npm run check                   # 類型檢查
-cd src-tauri && cargo test      # 後端整合測試 (12 個測試檔，音訊測試預設跳過)
+cd src-tauri && cargo test      # 後端整合測試 (17 個測試檔，音訊測試預設跳過)
 cd src-tauri && cargo test --features audio-tests  # 含音訊測試 (需音訊裝置)
 npm run quality                 # 程式碼品質檢查 (ESLint + Prettier + Stylelint + Clippy + rustfmt)
 ```
@@ -122,8 +128,8 @@ npm run quality                 # 程式碼品質檢查 (ESLint + Prettier + Sty
 ```
 src/                              # 前端 (Svelte 5 + TypeScript)
   lib/
-    api/                          # Tauri IPC 呼叫封裝 (playback, library, playlist)
-    components/                   # UI 元件 (Player, Library, Browse, Playlist, Sidebar, Settings)
+    api/                          # Tauri IPC 呼叫封裝 (playback, library, playlist, tag)
+    components/                   # UI 元件 (Player, Library, Browse, Tags, Playlist, Common)
     state/                        # 響應式狀態管理 (Svelte 5 runes)
     logic/                        # 純函式邏輯 (播放模式、快捷鍵、格式化、選取、排序)
     types/                        # TypeScript 型別定義
@@ -132,8 +138,8 @@ src-tauri/                        # 後端 (Rust)
     audio/                        # 音訊引擎 (rodio sink, gapless queue)
     scanner/                      # 資料夾掃描與檔案監視 (walkdir, notify)
     metadata/                     # 元資料讀寫與封面快取 (lofty)
-    storage/                      # SQLite 資料庫 (schema v5, WAL mode)
-    commands/                     # Tauri command handlers (35 個 IPC 介面)
-    models/                       # 資料結構定義 (track, playlist, player_state)
-  tests/                          # 12 個整合測試
+    storage/                      # SQLite 資料庫 (schema v12, WAL mode)
+    commands/                     # Tauri command handlers
+    models/                       # 資料結構定義 (track, artist, tag, playlist, player_state)
+  tests/                          # 17 個整合測試
 ```

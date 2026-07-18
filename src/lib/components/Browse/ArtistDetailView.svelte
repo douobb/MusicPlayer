@@ -1,45 +1,42 @@
 <script lang="ts">
-  import type { Track, TrackDetails } from '$lib/types';
+  import type { ArtistRole, Track, TrackDetails } from '$lib/types';
   import TrackList from '../Library/TrackList.svelte';
   import TrackPropertiesDialog from '../Library/TrackPropertiesDialog.svelte';
+  import CollectionToolbar from '../Common/CollectionToolbar.svelte';
   import StatusBar from '../Library/StatusBar.svelte';
   import { getPlaylistState } from '$lib/state/playlistState.svelte';
   import { getPlayerState } from '$lib/state/playerState.svelte';
   import { getLibraryState } from '$lib/state/libraryState.svelte';
   import * as libraryApi from '$lib/api/library';
-  import { startPlayingTrack } from '$lib/logic/playback-actions';
+  import { playCollectionTrack } from '$lib/logic/collection-actions';
   import { optimisticRemove } from '$lib/logic/track-actions';
   import { notifyCritical } from '$lib/logic/error-handler';
 
-  let { artistName }: { artistName: string } = $props();
-
-  const playlistState = getPlaylistState();
-  const player = getPlayerState();
-  const library = getLibraryState();
-
-  let tracks = $state<Track[]>([]);
-  let isLoading = $state(true);
-
-  let showProperties = $state(false);
-  let propertiesDetails = $state<TrackDetails | null>(null);
-
-  function goBack() {
-    playlistState.activeView = { kind: 'artists' };
+  let { artistId, artistName }: { artistId: number; artistName: string } = $props();
+  const playlistState = getPlaylistState(),
+    player = getPlayerState(),
+    library = getLibraryState();
+  let tracks = $state<Track[]>([]),
+    isLoading = $state(true),
+    role = $state<'all' | ArtistRole>('all');
+  let showProperties = $state(false),
+    propertiesDetails = $state<TrackDetails | null>(null);
+  async function load() {
+    isLoading = true;
+    try {
+      tracks = await libraryApi.getTracksByArtist(artistId, role === 'all' ? undefined : role);
+    } catch (err) {
+      notifyCritical('Load artist tracks', err);
+    } finally {
+      isLoading = false;
+    }
   }
-
-  async function handlePlay(track: Track) {
-    await startPlayingTrack(track, tracks);
-  }
-
-  async function handleRemove(tracksToRemove: Track[]) {
-    await optimisticRemove(tracksToRemove, {
+  async function handleRemove(items: Track[]) {
+    await optimisticRemove(items, {
       getLocalTracks: () => tracks,
-      setLocalTracks: (v) => {
-        tracks = v;
-      },
+      setLocalTracks: (v) => (tracks = v),
     });
   }
-
   async function handleProperties(track: Track) {
     try {
       propertiesDetails = await libraryApi.getTrackDetails(track.id);
@@ -48,134 +45,114 @@
       notifyCritical('Get track details', err);
     }
   }
-
-  async function handleSaveMetadata(update: { title: string; artist: string; album: string }) {
+  async function handleSaveMetadata(update: {
+    title: string;
+    performers: string[];
+    originalPerformers: string[];
+  }) {
     if (!propertiesDetails) return;
     try {
       const updated = await libraryApi.updateTrackMetadata(
         propertiesDetails.id,
         update.title,
-        update.artist,
-        update.album,
+        update.performers,
+        update.originalPerformers,
       );
       tracks = tracks.map((t) => (t.id === updated.id ? updated : t));
       library.allTracks = library.allTracks.map((t) => (t.id === updated.id ? updated : t));
       propertiesDetails = {
         ...propertiesDetails,
-        title: update.title,
-        artist: update.artist,
-        album: update.album,
+        title: updated.title,
+        performers: updated.performers,
+        original_performers: updated.original_performers,
       };
-      if (player.currentTrack?.id === updated.id) {
-        player.currentTrack = updated;
-      }
+      if (player.currentTrack?.id === updated.id) player.currentTrack = updated;
     } catch (err) {
       notifyCritical('Update metadata', err);
     }
   }
-
   $effect(() => {
-    (async () => {
-      try {
-        tracks = await libraryApi.getTracksByArtist(artistName);
-      } catch (err) {
-        notifyCritical('Load artist tracks', err);
-      } finally {
-        isLoading = false;
-      }
-    })();
+    load();
   });
 </script>
 
-<div class="artist-detail-view">
-  <div class="header">
-    <button class="back-btn" onclick={goBack} aria-label="Back to artists">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-        <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
-      </svg>
-    </button>
+<div class="view">
+  <header>
+    <button onclick={() => (playlistState.activeView = { kind: 'artists' })}>←</button>
     <h2>{artistName}</h2>
-    <span class="track-count">{tracks.length} track{tracks.length !== 1 ? 's' : ''}</span>
-  </div>
-
-  {#if isLoading}
-    <div class="empty"><p>Loading...</p></div>
-  {:else}
-    <TrackList
+    <span>{tracks.length} 首</span>
+  </header>
+  <nav>
+    <button class:active={role === 'all'} onclick={() => (role = 'all')}>全部相關作品</button
+    ><button class:active={role === 'performer'} onclick={() => (role = 'performer')}
+      >演唱作品</button
+    ><button
+      class:active={role === 'original_performer'}
+      onclick={() => (role = 'original_performer')}>原唱作品</button
+    >
+  </nav>
+  {#if isLoading}<p class="empty">載入中…</p>{:else}<CollectionToolbar {tracks} /><TrackList
       {tracks}
       currentTrackId={player.currentTrack?.id ?? null}
-      onplay={handlePlay}
+      onplay={(track) => playCollectionTrack(track, tracks)}
       onremove={handleRemove}
       onproperties={handleProperties}
-    />
-    <StatusBar {tracks} />
-  {/if}
+    /><StatusBar {tracks} />{/if}
 </div>
-
-{#if showProperties && propertiesDetails}
-  <TrackPropertiesDialog
+{#if showProperties && propertiesDetails}<TrackPropertiesDialog
     details={propertiesDetails}
     onclose={() => {
       showProperties = false;
       propertiesDetails = null;
     }}
     onsave={handleSaveMetadata}
-  />
-{/if}
+  />{/if}
 
 <style>
-  .artist-detail-view {
+  .view {
+    height: 100%;
     display: flex;
     flex-direction: column;
-    height: 100%;
     padding: 20px;
-  }
-
-  .header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 16px;
-    flex-shrink: 0;
-  }
-
-  .back-btn {
-    background: transparent;
-    border: none;
-    color: #aaa;
-    cursor: pointer;
-    padding: 4px;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    transition:
-      color 0.15s,
-      background 0.15s;
-  }
-
-  .back-btn:hover {
     color: #eee;
-    background: rgb(255 255 255 / 10%);
+  }
+
+  header,
+  nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
 
   h2 {
     margin: 0;
-    font-size: 22px;
-    font-weight: 700;
-    color: #eee;
   }
 
-  .track-count {
-    font-size: 13px;
+  header span {
     color: #888;
   }
 
+  button {
+    background: #2a2a4a;
+    border: 0;
+    border-radius: 5px;
+    color: #ddd;
+    padding: 7px 11px;
+    cursor: pointer;
+  }
+
+  nav {
+    margin-top: 12px;
+  }
+
+  nav button.active {
+    background: #e94560;
+    color: #fff;
+  }
+
   .empty {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 300px;
-    color: #666;
+    text-align: center;
+    color: #777;
+    margin-top: 80px;
   }
 </style>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Track } from '$lib/types';
+  import { formatArtists } from '$lib/logic/format';
 
   let { track }: { track: Track | null } = $props();
 
@@ -12,7 +13,7 @@
   $effect(() => {
     // Access track to re-run when it changes
     const _ = track?.title;
-    const __ = track?.artist;
+    const __ = track ? formatArtists(track.performers) : '';
 
     // Wait for DOM update
     requestAnimationFrame(() => {
@@ -43,9 +44,9 @@
         {/if}
       </div>
       <div class="text-scroll" class:scrolling={artistOverflows}>
-        <div class="artist" bind:this={artistEl}>{track.artist}</div>
+        <div class="artist" bind:this={artistEl}>{formatArtists(track.performers)}</div>
         {#if artistOverflows}
-          <div class="artist" aria-hidden="true">{track.artist}</div>
+          <div class="artist" aria-hidden="true">{formatArtists(track.performers)}</div>
         {/if}
       </div>
     </div>

@@ -1,7 +1,7 @@
-const STORAGE_KEY = 'lyra-column-widths';
+const STORAGE_KEY = 'musicplayer-column-widths-v2';
 
-export const DEFAULT_WIDTHS = [0.3, 0.22, 0.22, 0.13, 0.13];
-export const MIN_WIDTHS = [0.1, 0.08, 0.08, 0.06, 0.06];
+export const DEFAULT_WIDTHS = [0.38, 0.3, 0.16, 0.16];
+export const MIN_WIDTHS = [0.12, 0.1, 0.06, 0.06];
 
 export function loadColumnWidths(): number[] {
   try {
@@ -10,7 +10,7 @@ export function loadColumnWidths(): number[] {
     const parsed = JSON.parse(raw);
     if (
       !Array.isArray(parsed) ||
-      parsed.length !== 5 ||
+      parsed.length !== 4 ||
       parsed.some((v: unknown) => typeof v !== 'number')
     ) {
       return [...DEFAULT_WIDTHS];

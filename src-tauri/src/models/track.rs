@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use super::artist::ArtistCredit;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FailedFile {
     pub file_path: String,
@@ -17,9 +19,8 @@ pub struct Track {
     pub id: i64,
     pub file_path: String,
     pub title: String,
-    pub artist: String,
-    pub album: String,
-    pub album_artist: Option<String>,
+    pub performers: Vec<ArtistCredit>,
+    pub original_performers: Vec<ArtistCredit>,
     pub duration_secs: f64,
     pub cover_art: Option<String>,
     pub cover_art_path: Option<String>,
@@ -33,8 +34,8 @@ pub struct TrackDetails {
     pub id: i64,
     pub file_path: String,
     pub title: String,
-    pub artist: String,
-    pub album: String,
+    pub performers: Vec<ArtistCredit>,
+    pub original_performers: Vec<ArtistCredit>,
     pub duration_secs: f64,
     pub file_size_bytes: i64,
     pub bitrate_kbps: Option<u32>,

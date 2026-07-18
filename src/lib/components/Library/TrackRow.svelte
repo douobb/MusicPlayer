@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Track } from '$lib/types';
-  import { formatDuration } from '$lib/logic/format';
+  import { formatArtists, formatDuration } from '$lib/logic/format';
 
   let {
     track,
@@ -41,8 +41,7 @@
   ondragstart={handleDragStart}
 >
   <td class="col-title">{track.title}</td>
-  <td class="col-artist">{track.artist}</td>
-  <td class="col-album">{track.album}</td>
+  <td class="col-artist">{formatArtists(track.performers)}</td>
   <td class="col-plays">{track.play_count > 0 ? track.play_count : ''}</td>
   <td class="col-duration">{formatDuration(track.duration_secs)}</td>
 </tr>
@@ -114,10 +113,6 @@
 
   .col-artist {
     color: #aaa;
-  }
-
-  .col-album {
-    color: #888;
   }
 
   .col-plays {

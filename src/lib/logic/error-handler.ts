@@ -7,7 +7,7 @@ import type { FailedFile, ImportResult } from '$lib/types';
  */
 export function warnNonCritical(context: string, err: unknown): void {
   const message = err instanceof Error ? err.message : String(err);
-  console.warn(`[lyra] ${context}: ${message}`);
+  console.warn(`[musicplayer] ${context}: ${message}`);
 }
 
 /**
@@ -17,7 +17,7 @@ export function warnNonCritical(context: string, err: unknown): void {
  */
 export function notifyCritical(context: string, err: unknown): void {
   const message = err instanceof Error ? err.message : String(err);
-  console.error(`[lyra] ${context}: ${message}`);
+  console.error(`[musicplayer] ${context}: ${message}`);
   pushError(`${context} failed: ${message}`);
 }
 

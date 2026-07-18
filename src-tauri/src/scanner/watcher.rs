@@ -11,7 +11,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use crate::error::AppError;
 use crate::metadata::reader;
 use crate::scanner::folder_scanner;
-use crate::storage::library_repo;
+use crate::storage::{folder_repo, library_repo};
 
 enum WatcherCommand {
     Watch(String),
@@ -186,10 +186,17 @@ fn process_event_batch(
             let Some(path_str) = path.to_str() else {
                 continue;
             };
+            // 忽略已暫停或已移除資料夾排隊中的殘留事件，避免曲目被意外更新或刪除。
+            if !matches!(
+                folder_repo::find_folder_for_file(&conn, path_str),
+                Ok(Some(_))
+            ) {
+                continue;
+            }
             match classify_path_event(event.kind, path) {
                 PathAction::Import => match process_new_file(&conn, app_handle, path_str) {
                     Ok(()) => changed = true,
-                    Err(e) => eprintln!("[lyra] watcher: failed to import {path_str}: {e}"),
+                    Err(e) => eprintln!("[musicplayer] watcher: failed to import {path_str}: {e}"),
                 },
                 PathAction::Remove => {
                     remove_track(&conn, path_str, &mut removed_track_ids);
@@ -304,7 +311,15 @@ fn process_new_file(
     file_path: &str,
 ) -> Result<(), AppError> {
     let mut track = reader::read_metadata(file_path)?;
-    let id = library_repo::insert_track(conn, &track)?;
+    let source_folder_id = folder_repo::find_folder_for_file(conn, file_path)?;
+    let modified_at_millis = std::fs::metadata(file_path)
+        .and_then(|metadata| metadata.modified())
+        .ok()
+        .and_then(|modified| modified.duration_since(std::time::UNIX_EPOCH).ok())
+        .and_then(|duration| i64::try_from(duration.as_millis()).ok())
+        .unwrap_or(0);
+    let id =
+        library_repo::insert_track_with_source(conn, &track, source_folder_id, modified_at_millis)?;
     track.id = id;
 
     let app_data_dir = app_handle

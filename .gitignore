@@ -49,6 +49,13 @@ coverage
 src-tauri/target/
 src-tauri/gen/schemas
 
+# Local databases
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
 # Claude Code 個人工作流設定（不納入版控）
 .claude/
 

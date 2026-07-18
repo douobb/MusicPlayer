@@ -16,7 +16,7 @@ describe('column-resize', () => {
   });
 
   it('saveColumnWidths persists and loadColumnWidths retrieves', () => {
-    const widths = [0.3, 0.25, 0.2, 0.12, 0.13];
+    const widths = [0.38, 0.3, 0.16, 0.16];
     saveColumnWidths(widths);
     expect(loadColumnWidths()).toEqual(widths);
   });
@@ -37,7 +37,7 @@ describe('column-resize', () => {
   });
 
   it('resetColumnWidths clears storage and returns defaults', () => {
-    saveColumnWidths([0.3, 0.25, 0.2, 0.12, 0.13]);
+    saveColumnWidths([0.38, 0.3, 0.16, 0.16]);
     const result = resetColumnWidths();
     expect(result).toEqual(DEFAULT_WIDTHS);
     expect(loadColumnWidths()).toEqual(DEFAULT_WIDTHS);

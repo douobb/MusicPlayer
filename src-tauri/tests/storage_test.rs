@@ -18,8 +18,7 @@ fn test_insert_and_get_tracks() {
     let tracks = library_repo::get_all_tracks(&conn).unwrap();
     assert_eq!(tracks.len(), 1);
     assert_eq!(tracks[0].title, "Test Track 1");
-    assert_eq!(tracks[0].artist, "Artist 1");
-    assert_eq!(tracks[0].album, "Album 1");
+    assert_eq!(tracks[0].performers[0].name, "Artist 1");
 }
 
 #[test]
@@ -45,8 +44,7 @@ fn test_upsert_updates_metadata_on_duplicate() {
     // Build a second track with the same file_path but different metadata
     let mut updated = common::create_test_track(1);
     updated.title = "Updated Title".to_string();
-    updated.artist = "Updated Artist".to_string();
-    updated.album = "Updated Album".to_string();
+    updated.performers[0].name = "Updated Artist".to_string();
     updated.duration_secs = 999.0;
     updated.file_size_bytes = 9_999_999;
 
@@ -60,8 +58,7 @@ fn test_upsert_updates_metadata_on_duplicate() {
     // metadata should be updated
     let found = library_repo::get_track_by_id(&conn, id1).unwrap().unwrap();
     assert_eq!(found.title, "Updated Title");
-    assert_eq!(found.artist, "Updated Artist");
-    assert_eq!(found.album, "Updated Album");
+    assert_eq!(found.performers[0].name, "Updated Artist");
     assert_eq!(found.duration_secs, 999.0);
     assert_eq!(found.file_size_bytes, 9_999_999);
 }
@@ -85,14 +82,14 @@ fn test_upsert_preserves_play_count() {
     // Re-insert with updated metadata
     let mut updated = common::create_test_track(1);
     updated.title = "Re-tagged Title".to_string();
-    updated.artist = "Re-tagged Artist".to_string();
+    updated.performers[0].name = "Re-tagged Artist".to_string();
     let id2 = library_repo::insert_track(&conn, &updated).unwrap();
     assert_eq!(id, id2);
 
     // Metadata should be updated
     let after = library_repo::get_track_by_id(&conn, id).unwrap().unwrap();
     assert_eq!(after.title, "Re-tagged Title");
-    assert_eq!(after.artist, "Re-tagged Artist");
+    assert_eq!(after.performers[0].name, "Re-tagged Artist");
 
     // play_count and last_played_at must be preserved
     assert_eq!(after.play_count, 3);
@@ -713,246 +710,6 @@ fn test_remove_from_playlist_track_not_in_playlist() {
 }
 
 // ============================================================
-// Album grouping tests (album + artist composite key)
-// ============================================================
-
-#[test]
-fn test_get_all_albums_groups_by_album_and_artist() {
-    let conn = common::create_test_db();
-
-    // Two tracks with the same album name but different artists
-    let mut t1 = common::create_test_track(1);
-    t1.album = "Greatest Hits".to_string();
-    t1.artist = "Artist A".to_string();
-
-    let mut t2 = common::create_test_track(2);
-    t2.album = "Greatest Hits".to_string();
-    t2.artist = "Artist B".to_string();
-
-    library_repo::insert_track(&conn, &t1).unwrap();
-    library_repo::insert_track(&conn, &t2).unwrap();
-
-    let albums = library_repo::get_all_albums(&conn).unwrap();
-    assert_eq!(
-        albums.len(),
-        2,
-        "same album name with different artists should produce 2 entries"
-    );
-
-    let names: Vec<&str> = albums.iter().map(|a| a.name.as_str()).collect();
-    assert!(names.iter().all(|n| *n == "Greatest Hits"));
-
-    let artists: Vec<&str> = albums.iter().map(|a| a.artist.as_str()).collect();
-    assert!(artists.contains(&"Artist A"));
-    assert!(artists.contains(&"Artist B"));
-}
-
-#[test]
-fn test_get_all_albums_same_artist_same_album_merges() {
-    let conn = common::create_test_db();
-
-    for i in 1..=3 {
-        let mut t = common::create_test_track(i);
-        t.album = "The Album".to_string();
-        t.artist = "Same Artist".to_string();
-        library_repo::insert_track(&conn, &t).unwrap();
-    }
-
-    let albums = library_repo::get_all_albums(&conn).unwrap();
-    assert_eq!(albums.len(), 1);
-    assert_eq!(albums[0].name, "The Album");
-    assert_eq!(albums[0].artist, "Same Artist");
-    assert_eq!(albums[0].track_count, 3);
-}
-
-#[test]
-fn test_get_all_albums_groups_by_album_artist() {
-    let conn = common::create_test_db();
-
-    // Same album split across three track artists, unified by album_artist
-    // (e.g. a compilation: each track tagged with its own performer)
-    for (i, artist) in (1u32..).zip(["Singer A", "Singer B", "Singer C"]) {
-        let mut t = common::create_test_track(i);
-        t.album = "Compilation Hits".to_string();
-        t.artist = artist.to_string();
-        t.album_artist = Some("Various Artists".to_string());
-        library_repo::insert_track(&conn, &t).unwrap();
-    }
-
-    let albums = library_repo::get_all_albums(&conn).unwrap();
-    assert_eq!(
-        albums.len(),
-        1,
-        "tracks sharing album_artist should merge into one album card"
-    );
-    assert_eq!(albums[0].name, "Compilation Hits");
-    assert_eq!(albums[0].artist, "Various Artists");
-    assert_eq!(albums[0].track_count, 3);
-}
-
-#[test]
-fn test_get_all_albums_album_artist_mixed_with_fallback() {
-    let conn = common::create_test_db();
-
-    // t1 has an album_artist; t2 has none → falls back to its track artist
-    let mut t1 = common::create_test_track(1);
-    t1.album = "Greatest Hits".to_string();
-    t1.artist = "Artist A".to_string();
-    t1.album_artist = Some("Band X".to_string());
-
-    let mut t2 = common::create_test_track(2);
-    t2.album = "Greatest Hits".to_string();
-    t2.artist = "Artist B".to_string();
-    t2.album_artist = None;
-
-    library_repo::insert_track(&conn, &t1).unwrap();
-    library_repo::insert_track(&conn, &t2).unwrap();
-
-    let albums = library_repo::get_all_albums(&conn).unwrap();
-    assert_eq!(albums.len(), 2);
-
-    let artists: Vec<&str> = albums.iter().map(|a| a.artist.as_str()).collect();
-    assert!(artists.contains(&"Band X"));
-    assert!(artists.contains(&"Artist B"));
-}
-
-#[test]
-fn test_get_tracks_by_album_matches_album_artist_group() {
-    let conn = common::create_test_db();
-
-    for (i, artist) in (1u32..).zip(["Singer A", "Singer B", "Singer C"]) {
-        let mut t = common::create_test_track(i);
-        t.album = "Compilation Hits".to_string();
-        t.artist = artist.to_string();
-        t.album_artist = Some("Various Artists".to_string());
-        library_repo::insert_track(&conn, &t).unwrap();
-    }
-
-    // The artist key from the album card (= album_artist) must return all tracks
-    let tracks =
-        library_repo::get_tracks_by_album(&conn, "Compilation Hits", "Various Artists").unwrap();
-    assert_eq!(tracks.len(), 3);
-
-    // Querying by an individual track artist must not match the group
-    let tracks = library_repo::get_tracks_by_album(&conn, "Compilation Hits", "Singer A").unwrap();
-    assert!(tracks.is_empty());
-}
-
-#[test]
-fn test_get_all_albums_album_artist_name_collision_merges() {
-    // Contract test for a known trade-off: under the same album name, a track
-    // whose artist literally equals another group's album_artist computes the
-    // same COALESCE key and merges into that card.
-    let conn = common::create_test_db();
-
-    let mut t1 = common::create_test_track(1);
-    t1.album = "Shared Album".to_string();
-    t1.artist = "Singer A".to_string();
-    t1.album_artist = Some("Various Artists".to_string());
-
-    let mut t2 = common::create_test_track(2);
-    t2.album = "Shared Album".to_string();
-    t2.artist = "Various Artists".to_string();
-    t2.album_artist = None;
-
-    library_repo::insert_track(&conn, &t1).unwrap();
-    library_repo::insert_track(&conn, &t2).unwrap();
-
-    let albums = library_repo::get_all_albums(&conn).unwrap();
-    assert_eq!(albums.len(), 1);
-    assert_eq!(albums[0].artist, "Various Artists");
-    assert_eq!(albums[0].track_count, 2);
-
-    let tracks =
-        library_repo::get_tracks_by_album(&conn, "Shared Album", "Various Artists").unwrap();
-    assert_eq!(tracks.len(), 2);
-}
-
-#[test]
-fn test_insert_track_upsert_updates_album_artist() {
-    let conn = common::create_test_db();
-
-    let mut t = common::create_test_track(1);
-    t.album_artist = None;
-    library_repo::insert_track(&conn, &t).unwrap();
-
-    // Rescan after the file gained an album artist tag
-    t.album_artist = Some("New Band".to_string());
-    let id = library_repo::insert_track(&conn, &t).unwrap();
-
-    let stored = library_repo::get_track_by_id(&conn, id).unwrap().unwrap();
-    assert_eq!(stored.album_artist.as_deref(), Some("New Band"));
-}
-
-#[test]
-fn test_get_tracks_by_album_filters_by_artist() {
-    let conn = common::create_test_db();
-
-    let mut t1 = common::create_test_track(1);
-    t1.album = "Greatest Hits".to_string();
-    t1.artist = "Artist A".to_string();
-
-    let mut t2 = common::create_test_track(2);
-    t2.album = "Greatest Hits".to_string();
-    t2.artist = "Artist B".to_string();
-
-    library_repo::insert_track(&conn, &t1).unwrap();
-    library_repo::insert_track(&conn, &t2).unwrap();
-
-    let tracks_a = library_repo::get_tracks_by_album(&conn, "Greatest Hits", "Artist A").unwrap();
-    assert_eq!(tracks_a.len(), 1);
-    assert_eq!(tracks_a[0].artist, "Artist A");
-
-    let tracks_b = library_repo::get_tracks_by_album(&conn, "Greatest Hits", "Artist B").unwrap();
-    assert_eq!(tracks_b.len(), 1);
-    assert_eq!(tracks_b[0].artist, "Artist B");
-}
-
-#[test]
-fn test_get_tracks_by_album_no_match() {
-    let conn = common::create_test_db();
-
-    let mut t = common::create_test_track(1);
-    t.album = "Real Album".to_string();
-    t.artist = "Real Artist".to_string();
-    library_repo::insert_track(&conn, &t).unwrap();
-
-    // Wrong artist
-    let result = library_repo::get_tracks_by_album(&conn, "Real Album", "Wrong Artist").unwrap();
-    assert!(result.is_empty());
-
-    // Wrong album
-    let result = library_repo::get_tracks_by_album(&conn, "Wrong Album", "Real Artist").unwrap();
-    assert!(result.is_empty());
-}
-
-#[test]
-fn test_get_all_albums_empty_library() {
-    let conn = common::create_test_db();
-    let albums = library_repo::get_all_albums(&conn).unwrap();
-    assert!(albums.is_empty());
-}
-
-#[test]
-fn test_get_tracks_by_album_multiple_tracks() {
-    let conn = common::create_test_db();
-
-    for i in 1..=5 {
-        let mut t = common::create_test_track(i);
-        t.album = "Big Album".to_string();
-        t.artist = "The Band".to_string();
-        library_repo::insert_track(&conn, &t).unwrap();
-    }
-
-    let tracks = library_repo::get_tracks_by_album(&conn, "Big Album", "The Band").unwrap();
-    assert_eq!(tracks.len(), 5);
-    for track in &tracks {
-        assert_eq!(track.album, "Big Album");
-        assert_eq!(track.artist, "The Band");
-    }
-}
-
-// ============================================================
 // Play count tests
 // ============================================================
 
@@ -1129,26 +886,3 @@ fn test_create_playlist_auto_sort_order() {
 // ============================================================
 // Scan folder remove tests
 // ============================================================
-
-#[test]
-fn test_remove_scan_folder() {
-    let conn = common::create_test_db();
-    library_repo::add_scan_folder(&conn, "/music/folder1").unwrap();
-    library_repo::add_scan_folder(&conn, "/music/folder2").unwrap();
-
-    let folders = library_repo::get_all_scan_folders(&conn).unwrap();
-    assert_eq!(folders.len(), 2);
-
-    library_repo::remove_scan_folder(&conn, "/music/folder1").unwrap();
-
-    let folders = library_repo::get_all_scan_folders(&conn).unwrap();
-    assert_eq!(folders.len(), 1);
-    assert_eq!(folders[0], "/music/folder2");
-}
-
-#[test]
-fn test_remove_scan_folder_nonexistent_no_error() {
-    let conn = common::create_test_db();
-    let result = library_repo::remove_scan_folder(&conn, "/nonexistent/path");
-    assert!(result.is_ok());
-}

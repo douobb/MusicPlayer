@@ -340,7 +340,7 @@ describe('getSelectedTracks', () => {
     const selection = selectSingle(tracks, 0);
     const result = getSelectedTracks(tracks, selection);
     expect(result[0].title).toBe(tracks[0].title);
-    expect(result[0].artist).toBe(tracks[0].artist);
+    expect(result[0].performers).toEqual(tracks[0].performers);
   });
 });
 

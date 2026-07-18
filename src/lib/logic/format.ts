@@ -1,3 +1,5 @@
+import type { ArtistCredit } from '$lib/types';
+
 /**
  * Format seconds into "m:ss" display string.
  * Used by TrackRow and ProgressBar.
@@ -9,21 +11,25 @@ export function formatDuration(secs: number): string {
 }
 
 /**
- * Filter tracks by search query (case-insensitive match on title, artist, album).
+ * Filter tracks by search query (case-insensitive match on title and artist).
  * Used by LibraryView.
  */
-export function filterTracks<T extends { title: string; artist: string; album: string }>(
-  tracks: T[],
-  query: string,
-): T[] {
+export function formatArtists(artists: ArtistCredit[]): string {
+  return artists.map((artist) => artist.name).join('、') || 'Unknown Artist';
+}
+
+export function filterTracks<
+  T extends { title: string; performers: ArtistCredit[]; original_performers: ArtistCredit[] },
+>(tracks: T[], query: string): T[] {
   const trimmed = query.trim();
   if (!trimmed) return tracks;
   const lower = trimmed.toLowerCase();
   return tracks.filter(
     (t) =>
       t.title.toLowerCase().includes(lower) ||
-      t.artist.toLowerCase().includes(lower) ||
-      t.album.toLowerCase().includes(lower),
+      [...t.performers, ...t.original_performers].some((artist) =>
+        artist.name.toLowerCase().includes(lower),
+      ),
   );
 }
 

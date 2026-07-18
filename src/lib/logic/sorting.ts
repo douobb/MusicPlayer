@@ -1,4 +1,5 @@
 import type { Track, SortConfig, SortColumn } from '$lib/types';
+import { formatArtists } from '$lib/logic/format';
 
 const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
 
@@ -10,7 +11,9 @@ export function sortTracks(tracks: Track[], config: SortConfig): Track[] {
     if (column === 'duration_secs' || column === 'play_count') {
       cmp = (a[column] as number) - (b[column] as number);
     } else {
-      cmp = collator.compare(a[column], b[column]);
+      const left = column === 'artist' ? formatArtists(a.performers) : a[column];
+      const right = column === 'artist' ? formatArtists(b.performers) : b[column];
+      cmp = collator.compare(left, right);
     }
     return direction === 'asc' ? cmp : -cmp;
   });

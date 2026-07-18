@@ -1,10 +1,17 @@
+export interface ArtistCredit {
+  artist_id: number;
+  name: string;
+  position: number;
+}
+
+export type ArtistRole = 'performer' | 'original_performer';
+
 export interface Track {
   id: number;
   file_path: string;
   title: string;
-  artist: string;
-  album: string;
-  album_artist: string | null;
+  performers: ArtistCredit[];
+  original_performers: ArtistCredit[];
   duration_secs: number;
   cover_art: string | null;
   cover_art_path: string | null;
@@ -13,6 +20,28 @@ export interface Track {
   last_played_at: string | null;
 }
 
+export interface LibraryFolder {
+  id: number;
+  folder_path: string;
+  enabled: boolean;
+  track_count: number;
+  last_scan_at: string | null;
+  last_error: string | null;
+  last_added: number;
+  last_updated: number;
+  last_unchanged: number;
+  last_removed: number;
+  last_failed: number;
+}
+
+export interface FolderSyncResult {
+  folder_id: number;
+  added: number;
+  updated: number;
+  unchanged: number;
+  removed: number;
+  failed_files: FailedFile[];
+}
 export interface FailedFile {
   file_path: string;
   error: string;
@@ -36,8 +65,8 @@ export interface TrackDetails {
   id: number;
   file_path: string;
   title: string;
-  artist: string;
-  album: string;
+  performers: ArtistCredit[];
+  original_performers: ArtistCredit[];
   duration_secs: number;
   file_size_bytes: number;
   bitrate_kbps: number | null;
@@ -61,18 +90,25 @@ export interface PlayerState {
 }
 
 export interface ArtistSummary {
+  id: number;
+  name: string;
+  track_count: number;
+  performer_track_count: number;
+  original_track_count: number;
+}
+
+export interface TagSummary {
+  id: number;
   name: string;
   track_count: number;
 }
-
-export interface AlbumSummary {
+export interface TagAssignment {
+  id: number;
   name: string;
-  artist: string;
-  track_count: number;
-  cover_art_path: string | null;
+  assigned_count: number;
 }
 
-export type SortColumn = 'title' | 'artist' | 'album' | 'duration_secs' | 'play_count';
+export type SortColumn = 'title' | 'artist' | 'duration_secs' | 'play_count';
 export type SortDirection = 'asc' | 'desc';
 
 export interface SortConfig {

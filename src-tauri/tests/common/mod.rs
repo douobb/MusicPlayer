@@ -10,30 +10,46 @@ pub fn create_test_db() -> Connection {
     conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
     conn.execute_batch(
         "
-        CREATE TABLE IF NOT EXISTS tracks (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            file_path   TEXT NOT NULL UNIQUE,
-            title       TEXT NOT NULL,
-            artist      TEXT NOT NULL DEFAULT 'Unknown Artist',
-            album       TEXT NOT NULL DEFAULT 'Unknown Album',
-            album_artist TEXT,
-            duration_secs REAL NOT NULL DEFAULT 0.0,
-            cover_art   TEXT,
-            cover_art_path TEXT,
+        CREATE TABLE tracks (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            file_path       TEXT NOT NULL UNIQUE,
+            title           TEXT NOT NULL,
+            duration_secs   REAL NOT NULL DEFAULT 0.0,
+            cover_art       TEXT,
+            cover_art_path  TEXT,
             file_size_bytes INTEGER NOT NULL DEFAULT 0,
-            play_count INTEGER NOT NULL DEFAULT 0,
-            last_played_at TEXT
+            play_count      INTEGER NOT NULL DEFAULT 0,
+            last_played_at  TEXT,
+            source_folder_id INTEGER,
+            modified_at_millis INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (source_folder_id) REFERENCES scan_folders(id) ON DELETE SET NULL
         );
 
-        CREATE TABLE IF NOT EXISTS playlists (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            name        TEXT NOT NULL,
-            last_track_id   INTEGER,
-            last_position_secs REAL DEFAULT 0.0,
-            sort_order  INTEGER NOT NULL DEFAULT 0
+        CREATE TABLE artists (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            name            TEXT NOT NULL,
+            normalized_name TEXT NOT NULL UNIQUE
         );
 
-        CREATE TABLE IF NOT EXISTS playlist_tracks (
+        CREATE TABLE track_artist_credits (
+            track_id  INTEGER NOT NULL,
+            artist_id INTEGER NOT NULL,
+            role      TEXT NOT NULL CHECK (role IN ('performer', 'original_performer')),
+            position  INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (track_id, artist_id, role),
+            UNIQUE (track_id, role, position),
+            FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE,
+            FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE CASCADE
+        );
+        CREATE TABLE playlists (
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            name                TEXT NOT NULL,
+            last_track_id       INTEGER,
+            last_position_secs  REAL DEFAULT 0.0,
+            sort_order          INTEGER NOT NULL DEFAULT 0
+        );
+
+        CREATE TABLE playlist_tracks (
             playlist_id INTEGER NOT NULL,
             track_id    INTEGER NOT NULL,
             sort_order  INTEGER NOT NULL,
@@ -42,27 +58,53 @@ pub fn create_test_db() -> Connection {
             FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE
         );
 
-        CREATE TABLE IF NOT EXISTS scan_folders (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            folder_path TEXT NOT NULL UNIQUE
+        CREATE TABLE scan_folders (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            folder_path    TEXT NOT NULL UNIQUE,
+            normalized_path TEXT NOT NULL UNIQUE,
+            enabled        INTEGER NOT NULL DEFAULT 1,
+            last_scan_at   TEXT,
+            last_error     TEXT,
+            last_added     INTEGER NOT NULL DEFAULT 0,
+            last_updated   INTEGER NOT NULL DEFAULT 0,
+            last_unchanged INTEGER NOT NULL DEFAULT 0,
+            last_removed   INTEGER NOT NULL DEFAULT 0,
+            last_failed    INTEGER NOT NULL DEFAULT 0
         );
 
-        CREATE INDEX IF NOT EXISTS idx_tracks_album_artist ON tracks(album, artist);
+        CREATE TABLE tags (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            name            TEXT NOT NULL,
+            normalized_name TEXT NOT NULL UNIQUE
+        );
+
+        CREATE TABLE track_tags (
+            track_id INTEGER NOT NULL,
+            tag_id   INTEGER NOT NULL,
+            PRIMARY KEY (track_id, tag_id),
+            FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE,
+            FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX idx_track_tags_tag_id ON track_tags(tag_id);
         ",
     )
     .expect("failed to create schema");
     conn
 }
 
-/// Create a test Track with sensible defaults. The `idx` parameter makes each track unique.
+/// 建立具備合理預設值的測試曲目；`idx` 用來確保資料唯一。
 pub fn create_test_track(idx: u32) -> Track {
     Track {
         id: 0,
         file_path: format!("/tmp/test_music/track_{}.mp3", idx),
         title: format!("Test Track {}", idx),
-        artist: format!("Artist {}", idx),
-        album: format!("Album {}", idx),
-        album_artist: None,
+        performers: vec![musicplayer_lib::models::artist::ArtistCredit {
+            artist_id: 0,
+            name: format!("Artist {}", idx),
+            position: 0,
+        }],
+        original_performers: Vec::new(),
         duration_secs: 180.0 + idx as f64,
         cover_art: None,
         cover_art_path: None,
@@ -71,7 +113,6 @@ pub fn create_test_track(idx: u32) -> Track {
         last_played_at: None,
     }
 }
-
 /// Create a minimal valid WAV file (PCM 16-bit mono, 44100 Hz) in the given directory.
 /// Returns the full path to the created file.
 pub fn create_test_wav(dir: &std::path::Path, name: &str) -> std::path::PathBuf {

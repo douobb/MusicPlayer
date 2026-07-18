@@ -2,12 +2,13 @@
   import type { Track, TrackDetails } from '$lib/types';
   import TrackList from '../Library/TrackList.svelte';
   import TrackPropertiesDialog from '../Library/TrackPropertiesDialog.svelte';
+  import CollectionToolbar from '../Common/CollectionToolbar.svelte';
   import StatusBar from '../Library/StatusBar.svelte';
   import { getPlayerState } from '$lib/state/playerState.svelte';
   import { getPlaylistState } from '$lib/state/playlistState.svelte';
   import * as playlistApi from '$lib/api/playlist';
   import * as libraryApi from '$lib/api/library';
-  import { startPlayingTrack } from '$lib/logic/playback-actions';
+  import { playCollectionTrack } from '$lib/logic/collection-actions';
   import { optimisticTrash, optimisticPlaylistRemove } from '$lib/logic/track-actions';
   import { notifyCritical } from '$lib/logic/error-handler';
 
@@ -48,7 +49,7 @@
   }
 
   async function handlePlay(track: Track) {
-    await startPlayingTrack(track, tracks);
+    await playCollectionTrack(track, tracks);
   }
 
   async function handleRemove(tracksToRemove: Track[]) {
@@ -104,6 +105,7 @@
     <h2>{playlistName}</h2>
   </div>
 
+  <CollectionToolbar {tracks} />
   <TrackList
     {tracks}
     currentTrackId={player.currentTrack?.id ?? null}

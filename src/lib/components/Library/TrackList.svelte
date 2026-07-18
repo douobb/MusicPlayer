@@ -1,9 +1,10 @@
 <script lang="ts">
-  import type { Track, Playlist, SortConfig, SortColumn } from '$lib/types';
+  import type { Track, Playlist, SortConfig, SortColumn, TagAssignment } from '$lib/types';
   import TrackRow from './TrackRow.svelte';
   import { loadColumnWidths, saveColumnWidths, MIN_WIDTHS } from '$lib/logic/column-resize';
   import { getPlaylistState } from '$lib/state/playlistState.svelte';
   import * as playlistApi from '$lib/api/playlist';
+  import * as tagApi from '$lib/api/tag';
   import { calculateVisibleRange, scrollTopForIndex, ROW_HEIGHT } from '$lib/logic/virtual-scroll';
   import {
     createEmptySelection,
@@ -22,6 +23,7 @@
   } from '$lib/logic/selection';
   import { moveByKeyboard } from '$lib/logic/reorder';
   import { warnNonCritical } from '$lib/logic/error-handler';
+  import { askConfirmation } from '$lib/state/dialogState.svelte';
 
   let {
     tracks,
@@ -90,7 +92,13 @@
   });
 
   // Context menu state
+  type ContextSubmenu = 'playlists' | 'add-tag' | 'remove-tag';
   let showMenu = $state(false);
+  let contextSubmenu = $state<ContextSubmenu | null>(null);
+  let menuSearch = $state('');
+  let tagAssignments = $state<TagAssignment[]>([]);
+  let assignmentsLoading = $state(false);
+  let assignmentLoadEpoch = 0;
   let menuX = $state(0);
   let menuY = $state(0);
 
@@ -177,8 +185,10 @@
   function handleRowContextMenu(index: number, e: MouseEvent) {
     e.preventDefault();
     selection = resolveContextClick(selection, tracks, index);
-    menuX = e.clientX;
-    menuY = e.clientY;
+    menuX = Math.max(8, Math.min(e.clientX, window.innerWidth - 248));
+    menuY = Math.max(8, Math.min(e.clientY, window.innerHeight - 440));
+    contextSubmenu = null;
+    menuSearch = '';
     showMenu = true;
   }
 
@@ -247,12 +257,37 @@
   }
 
   // Context menu actions
+  function closeContextMenu() {
+    showMenu = false;
+    contextSubmenu = null;
+    menuSearch = '';
+    assignmentLoadEpoch += 1;
+  }
+
   function handleWindowClick() {
-    if (showMenu) showMenu = false;
+    if (showMenu) closeContextMenu();
+  }
+
+  async function openSubmenu(submenu: ContextSubmenu) {
+    contextSubmenu = submenu;
+    menuSearch = '';
+    if (submenu === 'playlists') return;
+
+    const ids = getSelectedTracks(tracks, selection).map((track) => track.id);
+    const epoch = ++assignmentLoadEpoch;
+    assignmentsLoading = true;
+    try {
+      const assignments = await tagApi.getTagAssignmentsForTracks(ids);
+      if (epoch === assignmentLoadEpoch) tagAssignments = assignments;
+    } catch (err) {
+      if (epoch === assignmentLoadEpoch) warnNonCritical('Load tag assignments', err);
+    } finally {
+      if (epoch === assignmentLoadEpoch) assignmentsLoading = false;
+    }
   }
 
   async function handleMenuAddToPlaylist(pl: Playlist) {
-    showMenu = false;
+    closeContextMenu();
     const selected = getSelectedTracks(tracks, selection);
     if (selected.length === 0) return;
     try {
@@ -265,26 +300,71 @@
     }
   }
 
-  function handleMenuRemove() {
-    showMenu = false;
+  async function handleMenuTag(tagId: number, remove: boolean) {
+    closeContextMenu();
+    const ids = getSelectedTracks(tracks, selection).map((track) => track.id);
+    if (!ids.length) return;
+    if (remove) {
+      const tagName = tagAssignments.find((tag) => tag.id === tagId)?.name ?? 'Tag';
+      if (
+        !(await askConfirmation({
+          title: `移除 Tag「${tagName}」？`,
+          message: `將從 ${ids.length} 首選取曲目移除此 Tag。`,
+          confirmLabel: '移除',
+          danger: true,
+          destructive: true,
+        }))
+      )
+        return;
+    }
+    try {
+      if (remove) await tagApi.removeTagsFromTracks(ids, [tagId]);
+      else await tagApi.addTagsToTracks(ids, [tagId]);
+    } catch (err) {
+      warnNonCritical(remove ? 'Remove tag' : 'Add tag', err);
+    }
+  }
+
+  async function handleMenuRemove() {
+    closeContextMenu();
     const selected = getSelectedTracks(tracks, selection);
     if (selected.length === 0) return;
+    if (
+      !(await askConfirmation({
+        title: `移除 ${selected.length} 首曲目？`,
+        message: '曲目將從目前清單或媒體庫移除；硬碟上的原始檔案不會被刪除。',
+        confirmLabel: '移除',
+        danger: true,
+        destructive: true,
+      }))
+    )
+      return;
     const ids = new Set(selected.map((t) => t.id));
     selection = removeFromSelection(selection, ids);
     onremove?.(selected);
   }
 
-  function handleMenuTrash() {
-    showMenu = false;
+  async function handleMenuTrash() {
+    closeContextMenu();
     const selected = getSelectedTracks(tracks, selection);
     if (selected.length === 0) return;
+    if (
+      !(await askConfirmation({
+        title: `將 ${selected.length} 首曲目移至資源回收筒？`,
+        message: '曲目會從媒體庫移除，硬碟上的音樂檔案將移至系統資源回收筒。',
+        confirmLabel: '移至資源回收筒',
+        danger: true,
+        destructive: true,
+      }))
+    )
+      return;
     const ids = new Set(selected.map((t) => t.id));
     selection = removeFromSelection(selection, ids);
     ontrash?.(selected);
   }
 
   function handleMenuProperties() {
-    showMenu = false;
+    closeContextMenu();
     if (selection.selectedIds.size !== 1) return;
     const selected = getSelectedTracks(tracks, selection);
     if (selected.length === 1) {
@@ -294,18 +374,32 @@
 
   // Reorder menu handlers
   function handleMenuMoveUp() {
-    showMenu = false;
+    closeContextMenu();
     const newOrder = moveByKeyboard(tracks, selection.selectedIds, 'up');
     if (newOrder) onreorder?.(newOrder);
   }
 
   function handleMenuMoveDown() {
-    showMenu = false;
+    closeContextMenu();
     const newOrder = moveByKeyboard(tracks, selection.selectedIds, 'down');
     if (newOrder) onreorder?.(newOrder);
   }
 
   let selectedCount = $derived(selection.selectedIds.size);
+  let filteredPlaylists = $derived(
+    playlistState.playlists.filter((playlist) =>
+      playlist.name.toLowerCase().includes(menuSearch.trim().toLowerCase()),
+    ),
+  );
+  let filteredTagAssignments = $derived(
+    tagAssignments.filter((assignment) => {
+      const matchesSearch = assignment.name.toLowerCase().includes(menuSearch.trim().toLowerCase());
+      if (!matchesSearch) return false;
+      if (contextSubmenu === 'add-tag') return assignment.assigned_count < selectedCount;
+      if (contextSubmenu === 'remove-tag') return assignment.assigned_count > 0;
+      return false;
+    }),
+  );
   let propertiesDisabled = $derived(selection.selectedIds.size !== 1);
   let canMoveUp = $derived(
     !!onreorder &&
@@ -323,7 +417,6 @@
   const headers: { label: string; column: SortColumn }[] = [
     { label: 'Title', column: 'title' },
     { label: 'Artist', column: 'artist' },
-    { label: 'Album', column: 'album' },
     { label: 'Plays', column: 'play_count' },
     { label: 'Duration', column: 'duration_secs' },
   ];
@@ -363,7 +456,7 @@
         <tr>
           {#each headers as header, i (header.column)}
             <th
-              class:th-duration={i === 4}
+              class:th-duration={i === 3}
               class:th-sortable={!!onsort}
               class:th-sorted={sortConfig?.column === header.column}
               onclick={() => {
@@ -372,7 +465,7 @@
               }}
             >
               <span class="th-label">{header.label}{getSortIndicator(header.column)}</span>
-              {#if i < 4}
+              {#if i < 3}
                 <div
                   class="resize-handle"
                   class:active={resizingIndex === i}
@@ -391,7 +484,7 @@
       <tbody>
         {#if visibleRange.topPadding > 0}
           <tr class="virtual-spacer" aria-hidden="true"
-            ><td colspan="5" style="height:{visibleRange.topPadding}px"></td></tr
+            ><td colspan="4" style="height:{visibleRange.topPadding}px"></td></tr
           >
         {/if}
         {#each visibleTracks as track, localIndex (track.id)}
@@ -408,7 +501,7 @@
         {/each}
         {#if visibleRange.bottomPadding > 0}
           <tr class="virtual-spacer" aria-hidden="true"
-            ><td colspan="5" style="height:{visibleRange.bottomPadding}px"></td></tr
+            ><td colspan="4" style="height:{visibleRange.bottomPadding}px"></td></tr
           >
         {/if}
       </tbody>
@@ -417,98 +510,145 @@
 </div>
 
 {#if showMenu}
-  <div class="context-menu" style="left: {menuX}px; top: {menuY}px;" role="menu">
-    {#if playlistState.playlists.length > 0}
-      <div class="menu-header">Add to playlist</div>
-      {#each playlistState.playlists as pl (pl.id)}
+  <div
+    class="context-menu"
+    style="left: {menuX}px; top: {menuY}px;"
+    role="menu"
+    tabindex="-1"
+    onclick={(event) => event.stopPropagation()}
+    onkeydown={(event) => {
+      if (event.key === 'Escape') closeContextMenu();
+      else if (event.key === 'ArrowLeft' && contextSubmenu) contextSubmenu = null;
+    }}
+  >
+    {#if contextSubmenu}
+      <div class="submenu-header">
+        <button
+          class="back-button"
+          aria-label="返回右鍵選單"
+          onclick={() => (contextSubmenu = null)}>←</button
+        >
+        <strong>
+          {contextSubmenu === 'playlists'
+            ? '加入播放清單'
+            : contextSubmenu === 'add-tag'
+              ? '新增 Tag'
+              : '移除 Tag'}
+        </strong>
+      </div>
+      <div class="menu-search">
+        <input
+          bind:value={menuSearch}
+          aria-label="搜尋選單項目"
+          placeholder={contextSubmenu === 'playlists' ? '搜尋播放清單…' : '搜尋 Tag…'}
+        />
+      </div>
+      <div class="submenu-list">
+        {#if contextSubmenu === 'playlists'}
+          {#each filteredPlaylists as playlist (playlist.id)}
+            <button
+              class="menu-item"
+              role="menuitem"
+              onclick={() => handleMenuAddToPlaylist(playlist)}
+            >
+              <span>♫</span><span class="item-name">{playlist.name}</span>
+            </button>
+          {:else}
+            <p class="menu-empty">找不到播放清單</p>
+          {/each}
+        {:else if assignmentsLoading}
+          <p class="menu-empty">正在讀取 Tag…</p>
+        {:else}
+          {#each filteredTagAssignments as assignment (assignment.id)}
+            <button
+              class="menu-item"
+              role="menuitem"
+              onclick={() => handleMenuTag(assignment.id, contextSubmenu === 'remove-tag')}
+            >
+              <span>{contextSubmenu === 'add-tag' ? '＋' : '－'}</span>
+              <span class="item-name">{assignment.name}</span>
+              {#if assignment.assigned_count > 0}
+                <span class="menu-status">
+                  {assignment.assigned_count === selectedCount ? '全部' : '部分'}
+                </span>
+              {/if}
+            </button>
+          {:else}
+            <p class="menu-empty">
+              {menuSearch.trim()
+                ? '找不到符合的 Tag'
+                : contextSubmenu === 'add-tag'
+                  ? '所有 Tag 都已套用'
+                  : '選取曲目沒有 Tag'}
+            </p>
+          {/each}
+        {/if}
+      </div>
+    {:else}
+      {#if playlistState.playlists.length > 0}
+        <button class="menu-item" role="menuitem" onclick={() => openSubmenu('playlists')}>
+          <span>♫</span><span class="item-name">加入播放清單</span><span class="chevron">›</span>
+        </button>
+      {/if}
+      <button class="menu-item" role="menuitem" onclick={() => openSubmenu('add-tag')}>
+        <span>＋</span><span class="item-name">新增 Tag</span><span class="chevron">›</span>
+      </button>
+      <button class="menu-item" role="menuitem" onclick={() => openSubmenu('remove-tag')}>
+        <span>－</span><span class="item-name">移除 Tag</span><span class="chevron">›</span>
+      </button>
+      <div class="menu-divider"></div>
+      {#if onreorder}
         <button
           class="menu-item"
+          class:menu-item-disabled={!canMoveUp}
           role="menuitem"
-          onclick={(e) => {
-            e.stopPropagation();
-            handleMenuAddToPlaylist(pl);
+          onclick={() => {
+            if (canMoveUp) handleMenuMoveUp();
           }}
         >
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-            <path
-              d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"
-            />
-          </svg>
-          {pl.name}
+          ▲ 上移 <span class="shortcut">Ctrl+Shift+↑</span>
         </button>
-      {/each}
+        <button
+          class="menu-item"
+          class:menu-item-disabled={!canMoveDown}
+          role="menuitem"
+          onclick={() => {
+            if (canMoveDown) handleMenuMoveDown();
+          }}
+        >
+          ▼ 下移 <span class="shortcut">Ctrl+Shift+↓</span>
+        </button>
+        <div class="menu-divider"></div>
+      {/if}
+      <button class="menu-item" role="menuitem" onclick={handleMenuRemove}>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+          <path d="M19 13H5v-2h14v2z" />
+        </svg>
+        移除{#if selectedCount > 1}
+          ({selectedCount}){/if}
+      </button>
+      <button class="menu-item menu-item-danger" role="menuitem" onclick={handleMenuTrash}>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+          <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+        </svg>
+        丟進垃圾桶{#if selectedCount > 1}
+          ({selectedCount}){/if}
+      </button>
       <div class="menu-divider"></div>
-    {/if}
-    {#if onreorder}
       <button
         class="menu-item"
-        class:menu-item-disabled={!canMoveUp}
+        class:menu-item-disabled={propertiesDisabled}
         role="menuitem"
-        onclick={(e) => {
-          e.stopPropagation();
-          if (canMoveUp) handleMenuMoveUp();
-        }}
+        onclick={handleMenuProperties}
       >
-        ▲ 上移 <span class="shortcut">Ctrl+Shift+↑</span>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+          <path
+            d="M11 17h2v-6h-2v6zm1-15C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zM11 9h2V7h-2v2z"
+          />
+        </svg>
+        屬性
       </button>
-      <button
-        class="menu-item"
-        class:menu-item-disabled={!canMoveDown}
-        role="menuitem"
-        onclick={(e) => {
-          e.stopPropagation();
-          if (canMoveDown) handleMenuMoveDown();
-        }}
-      >
-        ▼ 下移 <span class="shortcut">Ctrl+Shift+↓</span>
-      </button>
-      <div class="menu-divider"></div>
     {/if}
-    <button
-      class="menu-item"
-      role="menuitem"
-      onclick={(e) => {
-        e.stopPropagation();
-        handleMenuRemove();
-      }}
-    >
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-        <path d="M19 13H5v-2h14v2z" />
-      </svg>
-      移除{#if selectedCount > 1}
-        ({selectedCount}){/if}
-    </button>
-    <button
-      class="menu-item menu-item-danger"
-      role="menuitem"
-      onclick={(e) => {
-        e.stopPropagation();
-        handleMenuTrash();
-      }}
-    >
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
-      </svg>
-      丟進垃圾桶{#if selectedCount > 1}
-        ({selectedCount}){/if}
-    </button>
-    <div class="menu-divider"></div>
-    <button
-      class="menu-item"
-      class:menu-item-disabled={propertiesDisabled}
-      role="menuitem"
-      onclick={(e) => {
-        e.stopPropagation();
-        handleMenuProperties();
-      }}
-    >
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-        <path
-          d="M11 17h2v-6h-2v6zm1-15C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zM11 9h2V7h-2v2z"
-        />
-      </svg>
-      屬性
-    </button>
   </div>
 {/if}
 
@@ -612,18 +752,89 @@
     background: #1e1e3a;
     border: 1px solid #3a3a5a;
     border-radius: 6px;
+    width: 240px;
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
     padding: 4px 0;
-    min-width: 180px;
+    overflow: hidden;
     box-shadow: 0 8px 24px rgb(0 0 0 / 50%);
   }
 
-  .menu-header {
-    padding: 6px 12px;
-    font-size: 11px;
+  .submenu-header {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 36px;
+    padding: 4px 8px;
+    border-bottom: 1px solid #3a3a5a;
+  }
+
+  .back-button {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: #ddd;
+    cursor: pointer;
+  }
+
+  .back-button:hover {
+    background: rgb(233 69 96 / 20%);
+  }
+
+  .menu-search {
+    padding: 8px;
+  }
+
+  .menu-search input {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 7px 9px;
+    border: 1px solid #3a3a5a;
+    border-radius: 5px;
+    outline: none;
+    background: #16162d;
+    color: #eee;
+  }
+
+  .menu-search input:focus {
+    border-color: #e94560;
+  }
+
+  .submenu-list {
+    max-height: min(320px, calc(100vh - 110px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .item-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .chevron,
+  .menu-status {
+    flex: none;
+    margin-left: auto;
     color: #888;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    font-weight: 600;
+  }
+
+  .menu-status {
+    font-size: 11px;
+  }
+
+  .menu-empty {
+    margin: 0;
+    padding: 18px 12px;
+    color: #777;
+    font-size: 12px;
+    text-align: center;
   }
 
   .menu-item {

@@ -17,9 +17,9 @@
     "format:check": "prettier --check \"src/**/*.{ts,svelte,css,json}\"",
     "stylelint": "stylelint \"src/**/*.{css,svelte}\"",
     "stylelint:fix": "stylelint \"src/**/*.{css,svelte}\" --fix",
-    "rust:fmt": "cargo fmt --manifest-path src-tauri/Cargo.toml",
-    "rust:fmt:check": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check",
-    "rust:clippy": "cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings",
+    "rust:fmt": "cargo fmt --all --manifest-path src-tauri/Cargo.toml",
+    "rust:fmt:check": "cargo fmt --all --manifest-path src-tauri/Cargo.toml -- --check",
+    "rust:clippy": "cargo clippy --workspace --manifest-path src-tauri/Cargo.toml -- -D warnings",
     "quality": "npm run format:check && npm run lint && npm run stylelint && npm run rust:fmt:check && npm run rust:clippy && npm run check",
     "prepare": "husky"
   },

@@ -40,7 +40,7 @@ MusicPlayer 基於 [twtrubiks/lyra-music](https://github.com/twtrubiks/lyra-musi
 - 新增設定頁與多個媒體庫資料夾管理，支援增量重掃、監看切換、啟動同步及失聯保護。
 - 以一致的應用程式內建彈框處理輸入與破壞性操作確認，並可在設定中關閉刪除確認。
 - 擴充 Artist 與 Tag 的播放、隨機播放、加入佇列及播放清單操作。
-- 規劃新增 Windows 工作列播放器，提供精簡的播放資訊與控制。
+- 新增 Windows 10／11 工作列播放器：預設使用透明嵌入模式，提供貼齊模式降級、即時水平位置調整、標題動態滾動、進度條、Mini Player 自動協調，以及基本播放與音量控制。
 - 保留播放清單、Mini Player、System Tray 與輕量背景播放能力。
 
 ## Lite 版

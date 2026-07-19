@@ -3,6 +3,7 @@
   import PlayButton from './PlayButton.svelte';
   import ProgressBar from './ProgressBar.svelte';
   import VolumeControl from './VolumeControl.svelte';
+  import TaskbarToggle from './TaskbarToggle.svelte';
   import { getPlayerState } from '$lib/state/playerState.svelte';
   import * as playbackApi from '$lib/api/playback';
   import { getNextIndex, getPrevIndex } from '$lib/logic/playmode';
@@ -178,6 +179,10 @@
       {/if}
     </svg>
   </button>
+
+  {#if !player.miniMode}
+    <TaskbarToggle />
+  {/if}
 </div>
 
 <style>

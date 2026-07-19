@@ -23,14 +23,21 @@
   } from '$lib/logic/playback-actions';
   import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
   import { listen } from '@tauri-apps/api/event';
+  import * as taskbarApi from '$lib/api/taskbar';
+  import { applyTaskbarStatus, getTaskbarState } from '$lib/state/taskbarState.svelte';
+  import { formatArtists } from '$lib/logic/format';
+  import { shouldShowTaskbarPlayer } from '$lib/logic/taskbar-visibility';
+  import type { TaskbarStatus } from '$lib/types';
 
   const player = getPlayerState();
   const library = getLibraryState();
+  const taskbar = getTaskbarState();
 
   let showShortcutsDialog = $state(false);
   let isDragOver = $state(false);
   let draggedPathCount = $state(0);
   let tauriDragDropActive = $state(false);
+  let requestedTaskbarVisibility: boolean | null = null;
 
   async function importDroppedPaths(paths: string[]) {
     if (library.isScanning || paths.length === 0) return;
@@ -84,6 +91,61 @@
     };
   });
 
+  // Windows 工作列播放器：初始化、狀態事件與播放快照同步。
+  $effect(() => {
+    taskbar.initialize().catch((error) => warnNonCritical('初始化工作列播放器', error));
+  });
+
+  $effect(() => {
+    let unlistenStatus: (() => void) | undefined;
+    (async () => {
+      try {
+        unlistenStatus = await listen<TaskbarStatus>('taskbar-status-changed', (event) => {
+          applyTaskbarStatus(event.payload);
+        });
+      } catch (error) {
+        warnNonCritical('監聽工作列播放器狀態', error);
+      }
+    })();
+    return () => unlistenStatus?.();
+  });
+
+  $effect(() => {
+    if (!taskbar.initialized || !taskbar.enabled) return;
+    // helper 異常結束時，status 變更會觸發此 effect，後端會在更新前自動重啟。
+    void taskbar.running;
+    const track = player.currentTrack;
+    const snapshot = {
+      title: track?.title ?? 'MusicPlayer',
+      artists: track ? formatArtists(track.performers) : '',
+      is_playing: player.isPlaying,
+      volume: player.volume,
+      can_previous: player.hasPrev,
+      can_next: player.hasNext,
+      position_secs: player.positionSecs,
+      duration_secs: player.durationSecs,
+      show_title_marquee: taskbar.showTitleMarquee,
+      show_progress: taskbar.showProgress,
+    };
+    taskbarApi
+      .updateTaskbarPlayer(snapshot)
+      .catch((error) => warnNonCritical('同步工作列播放器', error));
+  });
+
+  $effect(() => {
+    if (!taskbar.initialized || !taskbar.enabled) {
+      requestedTaskbarVisibility = null;
+      return;
+    }
+    const visible = shouldShowTaskbarPlayer(player.miniMode, taskbar.hideInMiniPlayer);
+    if (requestedTaskbarVisibility === visible) return;
+    requestedTaskbarVisibility = visible;
+    taskbarApi.setTaskbarPlayerVisible(visible).catch((error) => {
+      requestedTaskbarVisibility = null;
+      warnNonCritical('同步工作列播放器顯示狀態', error);
+    });
+  });
+
   const NORMAL_SIZE = { width: 1024, height: 680 };
   const MINI_SIZE = { width: 420, height: 80 };
 
@@ -120,12 +182,16 @@
     let unlistenClose: (() => void) | undefined;
     let unlistenPrev: (() => void) | undefined;
     let unlistenNext: (() => void) | undefined;
+    let unlistenTaskbarPrev: (() => void) | undefined;
+    let unlistenTaskbarNext: (() => void) | undefined;
+    let unlistenTrayWindowHidden: (() => void) | undefined;
 
     (async () => {
       try {
         const win = getCurrentWindow();
         unlistenClose = await win.onCloseRequested(async (event) => {
           event.preventDefault();
+          player.miniMode = false;
           await win.hide();
         });
         unlistenPrev = await listen('tray-prev', () => {
@@ -133,6 +199,15 @@
         });
         unlistenNext = await listen('tray-next', () => {
           handleNext();
+        });
+        unlistenTaskbarPrev = await listen('taskbar-prev', () => {
+          handlePrev();
+        });
+        unlistenTaskbarNext = await listen('taskbar-next', () => {
+          handleNext();
+        });
+        unlistenTrayWindowHidden = await listen('tray-window-hidden', () => {
+          player.miniMode = false;
         });
       } catch {
         // Window API not available (dev mode or test)
@@ -143,6 +218,9 @@
       unlistenClose?.();
       unlistenPrev?.();
       unlistenNext?.();
+      unlistenTaskbarPrev?.();
+      unlistenTaskbarNext?.();
+      unlistenTrayWindowHidden?.();
     };
   });
 

@@ -4,9 +4,11 @@
   import * as libraryApi from '$lib/api/library';
   import { notifyCritical } from '$lib/logic/error-handler';
   import { getPreferencesState } from '$lib/state/preferencesState.svelte';
+  import { getTaskbarState } from '$lib/state/taskbarState.svelte';
 
   type Section = 'general' | 'library' | 'playback' | 'windows' | 'about';
   const preferences = getPreferencesState();
+  const taskbar = getTaskbarState();
   let section = $state<Section>('library');
   let folders = $state<LibraryFolder[]>([]);
   let busyFolderId = $state<number | 'all' | 'add' | null>(null);
@@ -127,6 +129,50 @@
       .catch((error) => notifyCritical('載入媒體庫資料夾', error))
       .finally(() => (isLoading = false));
   });
+
+  $effect(() => {
+    taskbar.initialize().catch((error) => notifyCritical('載入 Windows 整合設定', error));
+  });
+
+  async function toggleTaskbarPlayer(enabled: boolean) {
+    try {
+      await taskbar.setEnabled(enabled);
+    } catch (error) {
+      notifyCritical('切換工作列播放器', error);
+    }
+  }
+
+  async function changeTaskbarMode(mode: 'auto' | 'docked') {
+    try {
+      await taskbar.setMode(mode);
+    } catch (error) {
+      notifyCritical('切換工作列播放器模式', error);
+    }
+  }
+
+  async function changeTaskbarOffset(offsetX: number) {
+    try {
+      await taskbar.setOffset(offsetX);
+    } catch (error) {
+      notifyCritical('調整工作列播放器位置', error);
+    }
+  }
+
+  async function changeTaskbarDisplayOptions(showTitleMarquee: boolean, showProgress: boolean) {
+    try {
+      await taskbar.setDisplayOptions(showTitleMarquee, showProgress);
+    } catch (error) {
+      notifyCritical('調整工作列播放器顯示內容', error);
+    }
+  }
+
+  async function changeTaskbarMiniModeBehavior(hideInMiniPlayer: boolean) {
+    try {
+      await taskbar.setMiniModeBehavior(hideInMiniPlayer);
+    } catch (error) {
+      notifyCritical('調整 Mini Player 與工作列播放器協調方式', error);
+    }
+  }
 </script>
 
 <div class="settings-view">
@@ -232,6 +278,129 @@
             />
           </label>
         </section>
+      {:else if section === 'windows'}
+        <section class="preferences-section">
+          <h3>工作列播放器</h3>
+          <p class="description">
+            嵌入模式為建議選項；若系統不相容會安全降級為貼齊模式。兩種模式皆以透明背景融入工作列。
+          </p>
+          <p class="platform-note">
+            僅支援 Windows 10／11 的主螢幕水平工作列；其他作業系統不會啟動 helper。
+          </p>
+          <label class="preference-row">
+            <span
+              ><strong>啟用工作列播放器</strong><small
+                >可播放／暫停、切換曲目及調整音量，設定會持久保存。</small
+              ></span
+            >
+            <input
+              type="checkbox"
+              checked={taskbar.enabled}
+              disabled={!taskbar.supported || taskbar.busy}
+              onchange={(event) => toggleTaskbarPlayer(event.currentTarget.checked)}
+            />
+          </label>
+          <label class="preference-row">
+            <span
+              ><strong>執行模式</strong><small
+                >優先使用嵌入模式；貼齊模式保留給不相容的系統環境。</small
+              ></span
+            >
+            <select
+              aria-label="工作列播放器執行模式"
+              value={taskbar.preferenceMode}
+              disabled={!taskbar.supported || taskbar.busy}
+              onchange={(event) =>
+                changeTaskbarMode(event.currentTarget.value as 'auto' | 'docked')}
+            >
+              <option value="auto">嵌入工作列（建議）</option>
+              <option value="docked">貼齊工作列（相容模式）</option>
+            </select>
+          </label>
+          <div class="preference-row">
+            <span
+              ><strong>嵌入位置</strong><small>0 最靠近通知區；使用負值向左移，避開其他工具。</small
+              ></span
+            >
+            <div class="offset-control" role="group" aria-label="工作列播放器水平偏移">
+              <button
+                type="button"
+                aria-label="工作列播放器向左移動"
+                title="向左移動 10 px"
+                disabled={!taskbar.supported || taskbar.busy || taskbar.offsetX <= -1600}
+                onclick={() => changeTaskbarOffset(taskbar.offsetX - 10)}>←</button
+              >
+              <output aria-label="目前工作列播放器水平偏移">{taskbar.offsetX} px</output>
+              <button
+                type="button"
+                aria-label="工作列播放器向右移動"
+                title="向右移動 10 px"
+                disabled={!taskbar.supported || taskbar.busy || taskbar.offsetX >= 0}
+                onclick={() => changeTaskbarOffset(taskbar.offsetX + 10)}>→</button
+              >
+            </div>
+          </div>
+          <label class="preference-row">
+            <span
+              ><strong>標題動態滾動</strong><small
+                >曲名與演唱者超出可用寬度時，以橫向跑馬燈完整顯示。</small
+              ></span
+            >
+            <input
+              aria-label="標題動態滾動"
+              type="checkbox"
+              checked={taskbar.showTitleMarquee}
+              disabled={!taskbar.supported || taskbar.busy}
+              onchange={(event) =>
+                changeTaskbarDisplayOptions(event.currentTarget.checked, taskbar.showProgress)}
+            />
+          </label>
+          <label class="preference-row">
+            <span
+              ><strong>播放進度條</strong><small
+                >在播放器底部顯示目前曲目的播放進度，不增加播放器高度。</small
+              ></span
+            >
+            <input
+              aria-label="播放進度條"
+              type="checkbox"
+              checked={taskbar.showProgress}
+              disabled={!taskbar.supported || taskbar.busy}
+              onchange={(event) =>
+                changeTaskbarDisplayOptions(taskbar.showTitleMarquee, event.currentTarget.checked)}
+            />
+          </label>
+          <label class="preference-row">
+            <span
+              ><strong>Mini Player 開啟時隱藏工作列播放器</strong><small
+                >避免同時顯示兩套播放控制；離開 Mini Player 後自動恢復。</small
+              ></span
+            >
+            <input
+              aria-label="Mini Player 開啟時隱藏工作列播放器"
+              type="checkbox"
+              checked={taskbar.hideInMiniPlayer}
+              disabled={!taskbar.supported || taskbar.busy}
+              onchange={(event) => changeTaskbarMiniModeBehavior(event.currentTarget.checked)}
+            />
+          </label>
+          <div class="integration-status" role="status" aria-label="工作列播放器狀態">
+            <strong>{taskbar.running ? '執行中' : taskbar.enabled ? '等待啟動' : '已關閉'}</strong>
+            <span>{taskbar.message}</span>
+            {#if taskbar.running && !taskbar.visible}
+              <small>顯示：Mini Player 使用中，暫時隱藏</small>
+            {/if}
+            {#if taskbar.mode}
+              <small
+                >模式：{taskbar.mode === 'embedded'
+                  ? '嵌入工作列'
+                  : taskbar.mode === 'docked'
+                    ? '貼齊工作列'
+                    : '無法使用'}</small
+              >
+            {/if}
+          </div>
+        </section>
       {:else if section === 'about'}
         <section class="placeholder">
           <h3>MusicPlayer</h3>
@@ -239,7 +408,7 @@
         </section>
       {:else}
         <section class="placeholder">
-          <h3>{section === 'playback' ? '播放設定' : 'Windows 整合'}</h3>
+          <h3>播放設定</h3>
           <p>相關選項會隨對應功能完成後加入。</p>
         </section>
       {/if}
@@ -330,6 +499,12 @@
     color: #888;
     margin: 5px 0;
     font-size: 13px;
+  }
+
+  .platform-note {
+    margin: 8px 0 0;
+    color: #aaa;
+    font-size: 12px;
   }
 
   button {
@@ -433,6 +608,22 @@
     max-width: 680px;
   }
 
+  .integration-status {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-top: 14px;
+    padding: 12px;
+    border: 1px solid #303050;
+    border-radius: 7px;
+    background: #16162a;
+  }
+
+  .integration-status span,
+  .integration-status small {
+    color: #999;
+  }
+
   .preference-row {
     display: flex;
     align-items: center;
@@ -455,10 +646,31 @@
     color: #888;
   }
 
-  .preference-row input {
+  .preference-row input[type='checkbox'] {
     width: 18px;
     height: 18px;
     accent-color: #e94560;
+  }
+
+  .offset-control {
+    display: grid;
+    grid-template-columns: 36px minmax(72px, auto) 36px;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .offset-control button {
+    width: 36px;
+    height: 32px;
+    padding: 0;
+    font-size: 18px;
+  }
+
+  .offset-control output {
+    color: #eee;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   .empty,

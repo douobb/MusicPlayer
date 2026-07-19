@@ -5,6 +5,7 @@ pub mod metadata;
 pub mod models;
 pub mod scanner;
 pub mod storage;
+pub mod taskbar;
 pub mod tray;
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -109,6 +110,10 @@ pub fn run() {
             app.manage(SharedPlayer::new(Mutex::new(player)));
             tray::create_tray(app)?;
 
+            let taskbar_manager = taskbar::TaskbarManager::new(app.handle())?;
+            taskbar_manager.restore(app.handle())?;
+            app.manage(taskbar_manager);
+
             let shutdown = Arc::new(AtomicBool::new(false));
             let shutdown_for_thread = Arc::<AtomicBool>::clone(&shutdown);
             let shutdown_for_event = Arc::<AtomicBool>::clone(&shutdown);
@@ -176,6 +181,16 @@ pub fn run() {
             commands::tag::add_tags_to_tracks,
             commands::tag::remove_tags_from_tracks,
             commands::tag::get_tracks_by_tag,
+            // Windows taskbar commands
+            commands::taskbar::get_taskbar_settings,
+            commands::taskbar::get_taskbar_status,
+            commands::taskbar::set_taskbar_player_enabled,
+            commands::taskbar::set_taskbar_player_mode,
+            commands::taskbar::set_taskbar_player_offset,
+            commands::taskbar::set_taskbar_player_display_options,
+            commands::taskbar::set_taskbar_player_mini_mode_behavior,
+            commands::taskbar::set_taskbar_player_visible,
+            commands::taskbar::update_taskbar_player,
             // Playlist commands
             commands::playlist::create_playlist,
             commands::playlist::rename_playlist,

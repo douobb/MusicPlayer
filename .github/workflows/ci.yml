@@ -80,7 +80,7 @@ jobs:
         run: npm run rust:clippy
 
       - name: Cargo test
-        run: cargo test
+        run: cargo test --workspace
         working-directory: src-tauri
 
   windows-test:
@@ -114,7 +114,7 @@ jobs:
         run: npm run test
 
       - name: Cargo test
-        run: cargo test --locked
+        run: cargo test --workspace --locked
         working-directory: src-tauri
 
       - name: Windows frontend build

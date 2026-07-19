@@ -2052,6 +2052,7 @@ version = "0.1.4"
 dependencies = [
  "base64 0.22.1",
  "lofty",
+ "musicplayer-taskbar-helper",
  "notify",
  "rodio",
  "rusqlite",
@@ -2064,6 +2065,16 @@ dependencies = [
  "thiserror 2.0.18",
  "trash",
  "walkdir",
+]
+
+[[package]]
+name = "musicplayer-taskbar-helper"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "windows 0.61.3",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

@@ -89,6 +89,40 @@ export interface PlayerState {
   gapless_transitioned: boolean;
 }
 
+export type TaskbarMode = 'embedded' | 'docked' | 'unavailable';
+export type TaskbarPreferenceMode = 'auto' | 'docked';
+
+export interface TaskbarSettings {
+  enabled: boolean;
+  mode: TaskbarPreferenceMode;
+  offset_x: number;
+  show_title_marquee: boolean;
+  show_progress: boolean;
+  hide_in_mini_player: boolean;
+}
+
+export interface TaskbarStatus {
+  supported: boolean;
+  enabled: boolean;
+  running: boolean;
+  visible: boolean;
+  mode: TaskbarMode | null;
+  message: string;
+}
+
+export interface TaskbarSnapshot {
+  title: string;
+  artists: string;
+  is_playing: boolean;
+  volume: number;
+  can_previous: boolean;
+  can_next: boolean;
+  position_secs: number;
+  duration_secs: number;
+  show_title_marquee: boolean;
+  show_progress: boolean;
+}
+
 export interface ArtistSummary {
   id: number;
   name: string;

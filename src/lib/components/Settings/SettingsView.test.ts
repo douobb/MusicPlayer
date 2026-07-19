@@ -10,7 +10,30 @@ const api = vi.hoisted(() => ({
   removeLibraryFolder: vi.fn(),
   openLibraryFolder: vi.fn(),
 }));
+const taskbarState = vi.hoisted(() => ({
+  supported: true,
+  enabled: false,
+  running: false,
+  visible: false,
+  mode: null as 'embedded' | 'docked' | 'unavailable' | null,
+  message: '工作列播放器已關閉',
+  preferenceMode: 'auto' as 'auto' | 'docked',
+  offsetX: 0,
+  showTitleMarquee: true,
+  showProgress: true,
+  hideInMiniPlayer: true,
+  busy: false,
+  initialize: vi.fn(),
+  setEnabled: vi.fn(),
+  setMode: vi.fn(),
+  setOffset: vi.fn(),
+  setDisplayOptions: vi.fn(),
+  setMiniModeBehavior: vi.fn(),
+}));
 vi.mock('$lib/api/library', () => api);
+vi.mock('$lib/state/taskbarState.svelte', () => ({
+  getTaskbarState: () => taskbarState,
+}));
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open: vi.fn() }));
 vi.mock('$lib/logic/error-handler', () => ({ notifyCritical: vi.fn() }));
 import SettingsView from './SettingsView.svelte';
@@ -44,6 +67,24 @@ describe('SettingsView library folders', () => {
     });
     api.setLibraryFolderWatching.mockResolvedValue(undefined);
     api.removeLibraryFolder.mockResolvedValue(0);
+    taskbarState.supported = true;
+    taskbarState.enabled = false;
+    taskbarState.running = false;
+    taskbarState.visible = false;
+    taskbarState.mode = null;
+    taskbarState.message = '工作列播放器已關閉';
+    taskbarState.preferenceMode = 'auto';
+    taskbarState.offsetX = 0;
+    taskbarState.showTitleMarquee = true;
+    taskbarState.showProgress = true;
+    taskbarState.hideInMiniPlayer = true;
+    taskbarState.busy = false;
+    taskbarState.initialize.mockResolvedValue(undefined);
+    taskbarState.setEnabled.mockResolvedValue(undefined);
+    taskbarState.setMode.mockResolvedValue(undefined);
+    taskbarState.setOffset.mockResolvedValue(undefined);
+    taskbarState.setDisplayOptions.mockResolvedValue(undefined);
+    taskbarState.setMiniModeBehavior.mockResolvedValue(undefined);
     getPreferencesState().confirmDeletions = true;
   });
 
@@ -74,5 +115,52 @@ describe('SettingsView library folders', () => {
     await fireEvent.click(checkbox);
     expect(getPreferencesState().confirmDeletions).toBe(false);
     expect(localStorage.getItem('musicplayer.confirm-deletions')).toBe('false');
+  });
+
+  it('可在 Windows 整合設定啟用工作列播放器', async () => {
+    render(SettingsView);
+    await fireEvent.click(screen.getByRole('button', { name: 'Windows 整合' }));
+    const checkbox = screen.getByRole('checkbox', { name: /啟用工作列播放器/ });
+    expect((checkbox as HTMLInputElement).checked).toBe(false);
+    await fireEvent.click(checkbox);
+    expect(taskbarState.setEnabled).toHaveBeenCalledWith(true);
+    expect(screen.getByRole('status', { name: '工作列播放器狀態' }).textContent).toContain(
+      '工作列播放器已關閉',
+    );
+
+    await fireEvent.change(screen.getByRole('combobox', { name: '工作列播放器執行模式' }), {
+      target: { value: 'docked' },
+    });
+    expect(taskbarState.setMode).toHaveBeenCalledWith('docked');
+    expect(
+      screen.getByText('僅支援 Windows 10／11 的主螢幕水平工作列；其他作業系統不會啟動 helper。'),
+    ).toBeTruthy();
+    expect(screen.getByRole('option', { name: '嵌入工作列（建議）' })).toBeTruthy();
+    expect(screen.getByRole('status', { name: '目前工作列播放器水平偏移' }).textContent).toBe(
+      '0 px',
+    );
+    await fireEvent.click(screen.getByRole('button', { name: '工作列播放器向左移動' }));
+    expect(taskbarState.setOffset).toHaveBeenCalledWith(-10);
+    expect(
+      (
+        screen.getByRole('button', {
+          name: '工作列播放器向右移動',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    const marquee = screen.getByRole('checkbox', { name: '標題動態滾動' });
+    const progress = screen.getByRole('checkbox', { name: '播放進度條' });
+    expect((marquee as HTMLInputElement).checked).toBe(true);
+    expect((progress as HTMLInputElement).checked).toBe(true);
+    await fireEvent.click(marquee);
+    expect(taskbarState.setDisplayOptions).toHaveBeenCalledWith(false, true);
+    await fireEvent.click(progress);
+    expect(taskbarState.setDisplayOptions).toHaveBeenCalledWith(true, false);
+    const miniCoordination = screen.getByRole('checkbox', {
+      name: 'Mini Player 開啟時隱藏工作列播放器',
+    });
+    expect((miniCoordination as HTMLInputElement).checked).toBe(true);
+    await fireEvent.click(miniCoordination);
+    expect(taskbarState.setMiniModeBehavior).toHaveBeenCalledWith(false);
   });
 });

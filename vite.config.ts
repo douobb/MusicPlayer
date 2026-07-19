@@ -12,6 +12,11 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 5173,
     strictPort: true,
+    // Cargo 會在開發模式持續重建並鎖定 DLL；Vite 不需要監看 Rust 建置輸出。
+    // Windows 上若嘗試監看被鎖定的 DLL，Node.js 會以 EBUSY 終止整個 dev server。
+    watch: {
+      ignored: ['**/src-tauri/target/**'],
+    },
   },
   resolve: {
     conditions: ['browser'],

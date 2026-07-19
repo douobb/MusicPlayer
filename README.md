@@ -37,7 +37,7 @@ MusicPlayer 尚未提供正式發佈版本。
 | 元資料解析 | lofty 0.24 | 讀寫 ID3/Vorbis/MP4 標籤與封面圖 |
 | 檔案監視 | notify 8 | 即時偵測資料夾變化，自動更新音樂庫 |
 | 資料庫 | SQLite (rusqlite, bundled) | WAL mode，schema migration 管理 |
-| 測試 | Vitest + cargo test | 前端 25 個測試檔、後端 17 個整合測試 |
+| 測試 | Vitest + cargo test | 前端 28 個測試檔、Rust workspace 自動測試 |
 
 ## 目前功能
 
@@ -48,6 +48,8 @@ MusicPlayer 尚未提供正式發佈版本。
 **播放清單與斷點續播** -- 建立、編輯、刪除播放清單，支援拖曳排序。每個播放清單記錄最後播放的曲目 ID 與秒數位置，切換播放清單時自動恢復上次播放進度。
 
 **Mini Player + System Tray** -- 按 `m` 切換為 420x80 精簡視窗（always-on-top）。系統匣支援 Play/Pause、上一首、下一首、顯示視窗、退出。關閉視窗時自動最小化到系統匣。
+
+**Windows 工作列播放器** -- 此功能僅支援 Windows 10／11 的主螢幕水平工作列，可從主播放器或「設定 > Windows 整合」啟用。預設採用嵌入工作列模式，不相容時可安全降級或手動切換為貼齊模式；可用左右按鈕即時調整水平位置以避開其他工具。透明背景與 Windows 字體可融入工作列，並提供曲名、演唱者、可關閉的標題動態滾動與進度條，以及基本播放與音量控制。預設在 Mini Player 開啟時暫時隱藏，離開或縮至 System Tray 後自動恢復，亦可在設定中允許兩者同時顯示。
 
 **Tauri 2 + Svelte 5 + Rust 架構** -- 前後端透過型別化的 Tauri commands 進行 IPC 通訊。前端以 Svelte 5 runes 管理狀態，後端以 Rust 處理音訊解碼、檔案 I/O、資料庫操作。
 
@@ -91,10 +93,10 @@ npm run tauri build   # 正式建置
 ## 測試
 
 ```bash
-npm run test                    # 前端單元與元件測試 (Vitest, 25 個測試檔)
+npm run test                    # 前端單元與元件測試 (Vitest, 28 個測試檔)
 npm run check                   # 類型檢查
-cd src-tauri && cargo test      # 後端整合測試 (17 個測試檔，音訊測試預設跳過)
-cd src-tauri && cargo test --features audio-tests  # 含音訊測試 (需音訊裝置)
+cd src-tauri && cargo test --workspace  # Rust workspace 自動測試（音訊測試預設跳過）
+cd src-tauri && cargo test --workspace --features audio-tests  # 含音訊測試 (需音訊裝置)
 npm run quality                 # 程式碼品質檢查 (ESLint + Prettier + Stylelint + Clippy + rustfmt)
 ```
 

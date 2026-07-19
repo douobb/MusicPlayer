@@ -37,7 +37,7 @@ Further reading: [Why Rust](docs/why-rust.md), [Tauri 2 Introduction](docs/tauri
 | Metadata Parsing | lofty 0.24 | Read/write ID3/Vorbis/MP4 tags and cover art |
 | File Watching | notify 8 | Real-time folder change detection, automatic music library updates |
 | Database | SQLite (rusqlite, bundled) | WAL mode, schema migration management |
-| Testing | Vitest + cargo test | 25 frontend test files, 17 backend integration tests |
+| Testing | Vitest + cargo test | 28 frontend test files and Rust workspace automated tests |
 
 ## Current Features
 
@@ -48,6 +48,8 @@ Further reading: [Why Rust](docs/why-rust.md), [Tauri 2 Introduction](docs/tauri
 **Playlists & resume playback** -- Create, edit, and delete playlists with drag-and-drop reordering. Each playlist records the last played track ID and position in seconds, automatically restoring playback progress when switching playlists.
 
 **Mini Player + System Tray** -- Press `m` to switch to a compact 420x80 window (always-on-top). System tray supports Play/Pause, previous, next, show window, and quit. Closing the window automatically minimizes to the system tray.
+
+**Windows taskbar player** -- This feature supports the primary horizontal taskbar on Windows 10/11 and can be enabled from the main player or **Settings > Windows Integration**. Embedded mode is the default; incompatible systems can safely fall back or switch manually to docked mode. Left and right buttons adjust its horizontal position immediately. Its transparent background and Windows font blend into the taskbar, with track title, performers, optional title marquee and progress bar, plus basic playback and volume controls. By default it hides temporarily while Mini Player is open and restores after leaving Mini Player or minimizing to the System Tray; settings can allow both controls to remain visible.
 
 **Tauri 2 + Svelte 5 + Rust architecture** -- Frontend and backend communicate through typed Tauri commands via IPC. The frontend manages state with Svelte 5 runes, while the backend handles audio decoding, file I/O, and database operations in Rust.
 
@@ -91,10 +93,10 @@ Build artifacts are located in `src-tauri/target/release/bundle/`, supporting de
 ## Testing
 
 ```bash
-npm run test                    # Frontend unit and component tests (Vitest, 25 test files)
+npm run test                    # Frontend unit and component tests (Vitest, 28 test files)
 npm run check                   # Type checking
-cd src-tauri && cargo test      # Backend integration tests (17 test files, audio tests skipped by default)
-cd src-tauri && cargo test --features audio-tests  # With audio tests (requires audio device)
+cd src-tauri && cargo test --workspace  # Rust workspace automated tests (audio tests skipped by default)
+cd src-tauri && cargo test --workspace --features audio-tests  # With audio tests (requires audio device)
 npm run quality                 # Code quality checks (ESLint + Prettier + Stylelint + Clippy + rustfmt)
 ```
 

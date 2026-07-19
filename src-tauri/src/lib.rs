@@ -170,6 +170,7 @@ pub fn run() {
             commands::tag::delete_empty_tags,
             commands::tag::merge_tags,
             commands::tag::get_all_tags,
+            commands::tag::get_tag_statistics,
             commands::tag::get_tags_for_track,
             commands::tag::get_tag_assignments_for_tracks,
             commands::tag::add_tags_to_tracks,

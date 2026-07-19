@@ -13,6 +13,43 @@ fn create_tag_trims_name_and_lists_empty_tag() {
 }
 
 #[test]
+fn tag_statistics_are_zero_for_an_empty_library() {
+    let conn = create_test_db();
+    let statistics = tag_repo::get_tag_statistics(&conn).unwrap();
+
+    assert_eq!(statistics.tag_count, 0);
+    assert_eq!(statistics.tagged_track_count, 0);
+    assert_eq!(statistics.untagged_track_count, 0);
+    assert_eq!(statistics.assignment_count, 0);
+    assert_eq!(statistics.average_tags_per_tagged_track, 0.0);
+    assert_eq!(statistics.most_used_tag, None);
+}
+
+#[test]
+fn tag_statistics_distinguish_tracks_from_assignments() {
+    let mut conn = create_test_db();
+    let first_track = library_repo::insert_track(&conn, &create_test_track(1)).unwrap();
+    let second_track = library_repo::insert_track(&conn, &create_test_track(2)).unwrap();
+    library_repo::insert_track(&conn, &create_test_track(3)).unwrap();
+    let rock = tag_repo::create_tag(&conn, "Rock").unwrap();
+    let chill = tag_repo::create_tag(&conn, "Chill").unwrap();
+
+    tag_repo::add_tags_to_tracks(&mut conn, &[first_track, second_track], &[rock.id]).unwrap();
+    tag_repo::add_tags_to_tracks(&mut conn, &[first_track], &[chill.id]).unwrap();
+
+    let statistics = tag_repo::get_tag_statistics(&conn).unwrap();
+    assert_eq!(statistics.tag_count, 2);
+    assert_eq!(statistics.tagged_track_count, 2);
+    assert_eq!(statistics.untagged_track_count, 1);
+    assert_eq!(statistics.assignment_count, 3);
+    assert_eq!(statistics.average_tags_per_tagged_track, 1.5);
+    let most_used_tag = statistics.most_used_tag.unwrap();
+    assert_eq!(most_used_tag.id, rock.id);
+    assert_eq!(most_used_tag.name, "Rock");
+    assert_eq!(most_used_tag.track_count, 2);
+}
+
+#[test]
 fn create_tag_rejects_blank_name() {
     let conn = create_test_db();
     assert!(tag_repo::create_tag(&conn, "   ").is_err());

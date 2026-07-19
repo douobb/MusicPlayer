@@ -102,6 +102,16 @@ export interface TagSummary {
   name: string;
   track_count: number;
 }
+
+export interface TagStatistics {
+  tag_count: number;
+  tagged_track_count: number;
+  untagged_track_count: number;
+  assignment_count: number;
+  average_tags_per_tagged_track: number;
+  most_used_tag: TagSummary | null;
+}
+
 export interface TagAssignment {
   id: number;
   name: string;

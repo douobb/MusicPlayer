@@ -51,7 +51,7 @@ Further reading: [Why Rust](docs/why-rust.md), [Tauri 2 Introduction](docs/tauri
 
 **Tauri 2 + Svelte 5 + Rust architecture** -- Frontend and backend communicate through typed Tauri commands via IPC. The frontend manages state with Svelte 5 runes, while the backend handles audio decoding, file I/O, and database operations in Rust.
 
-**Tags and shared collection actions** -- Albums have been replaced by an internal multi-tag system. It supports creating, renaming, deleting, merging, and cleaning empty tags, plus per-track and multi-select batch editing. The track context menu organizes playlists and tags into searchable, scrollable second-level menus, with “All/Partial” assignment states for multi-selection. All Music, Artist, Tag, and playlist views share play-all, shuffle, add-to-queue, and add-to-playlist actions.
+**Tags and shared collection actions** -- Albums have been replaced by an internal multi-tag system. It supports creating, renaming, deleting, merging, and cleaning empty tags, plus per-track and multi-select batch editing. The Tags view summarizes tag count, tagged and untagged tracks, assignments, average tags per tagged track, and the most-used tag. The track context menu organizes playlists and tags into searchable, scrollable second-level menus, with “All/Partial” assignment states for multi-selection. All Music, Artist, Tag, and playlist views share play-all, shuffle, add-to-queue, and add-to-playlist actions.
 
 **Multiple performers and original artists** -- Each track can store ordered lists of performers and original artists. Artists can be created, renamed, merged, and cleaned up, with works browsable by performer or original-artist role. Search, sorting, statistics, the player, and all track lists support multiple artists.
 

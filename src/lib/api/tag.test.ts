@@ -23,6 +23,7 @@ describe('tag API', () => {
   it('maps queries and batch associations', async () => {
     invoke.mockResolvedValue([]);
     await api.getAllTags();
+    await api.getTagStatistics();
     await api.getTagsForTrack(3);
     await api.getTagAssignmentsForTracks([3, 4]);
     await api.addTagsToTracks([3, 4], [1]);
@@ -30,6 +31,7 @@ describe('tag API', () => {
     await api.getTracksByTag(2);
     expect(invoke.mock.calls).toEqual([
       ['get_all_tags'],
+      ['get_tag_statistics'],
       ['get_tags_for_track', { trackId: 3 }],
       ['get_tag_assignments_for_tracks', { trackIds: [3, 4] }],
       ['add_tags_to_tracks', { trackIds: [3, 4], tagIds: [1] }],

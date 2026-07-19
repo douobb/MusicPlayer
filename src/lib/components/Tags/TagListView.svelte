@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { TagSummary } from '$lib/types';
+  import type { TagStatistics, TagSummary } from '$lib/types';
   import { getPlaylistState } from '$lib/state/playlistState.svelte';
   import * as tagApi from '$lib/api/tag';
   import { notifyCritical } from '$lib/logic/error-handler';
@@ -7,6 +7,14 @@
 
   const playlistState = getPlaylistState();
   let tags = $state<TagSummary[]>([]),
+    statistics = $state<TagStatistics>({
+      tag_count: 0,
+      tagged_track_count: 0,
+      untagged_track_count: 0,
+      assignment_count: 0,
+      average_tags_per_tagged_track: 0,
+      most_used_tag: null,
+    }),
     search = $state(''),
     newName = $state(''),
     sort = $state<'name' | 'count'>('name');
@@ -15,8 +23,13 @@
       (a, b) => (sort === 'name' ? a.name.localeCompare(b.name) : b.track_count - a.track_count),
     ),
   );
+  let averageTags = $derived(
+    statistics.average_tags_per_tagged_track.toLocaleString('zh-TW', {
+      maximumFractionDigits: 1,
+    }),
+  );
   async function reload() {
-    tags = await tagApi.getAllTags();
+    [tags, statistics] = await Promise.all([tagApi.getAllTags(), tagApi.getTagStatistics()]);
   }
   async function create() {
     const name = newName.trim();
@@ -109,6 +122,20 @@
       >
     </div>
   </header>
+  <section class="summary" aria-label="Tag 摘要統計">
+    <article><span>Tag</span><strong>{statistics.tag_count}</strong></article>
+    <article><span>已標記曲目</span><strong>{statistics.tagged_track_count}</strong></article>
+    <article><span>未標記曲目</span><strong>{statistics.untagged_track_count}</strong></article>
+    <article><span>Tag 關聯</span><strong>{statistics.assignment_count}</strong></article>
+    <article><span>平均 Tag 數</span><strong>{averageTags}</strong></article>
+    <article class="popular">
+      <span>最常使用</span><strong
+        >{statistics.most_used_tag
+          ? `${statistics.most_used_tag.name} · ${statistics.most_used_tag.track_count} 首`
+          : '—'}</strong
+      >
+    </article>
+  </section>
   <form
     onsubmit={(e) => {
       e.preventDefault();
@@ -177,6 +204,39 @@
     margin: 16px 0;
   }
 
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(100px, 1fr)) minmax(150px, 1.5fr);
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .summary article {
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid #2f2f4d;
+    border-radius: 7px;
+    background: #16162a;
+  }
+
+  .summary span,
+  .summary strong {
+    display: block;
+  }
+
+  .summary span {
+    margin-bottom: 5px;
+    color: #888;
+    font-size: 12px;
+  }
+
+  .summary strong {
+    overflow: hidden;
+    color: #eee;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   form input {
     width: 260px;
   }
@@ -213,5 +273,11 @@
     text-align: center;
     color: #777;
     margin-top: 80px;
+  }
+
+  @media (width <= 900px) {
+    .summary {
+      grid-template-columns: repeat(3, minmax(100px, 1fr));
+    }
   }
 </style>

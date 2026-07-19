@@ -1,12 +1,14 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const { getAllTags, createTag, deleteTag } = vi.hoisted(() => ({
+const { getAllTags, getTagStatistics, createTag, deleteTag } = vi.hoisted(() => ({
   getAllTags: vi.fn(),
+  getTagStatistics: vi.fn(),
   createTag: vi.fn(),
   deleteTag: vi.fn(),
 }));
 vi.mock('$lib/api/tag', () => ({
   getAllTags,
+  getTagStatistics,
   createTag,
   renameTag: vi.fn(),
   deleteTag,
@@ -23,6 +25,15 @@ import { getPreferencesState } from '$lib/state/preferencesState.svelte';
 describe('TagListView', () => {
   beforeEach(() => {
     getAllTags.mockReset();
+    getTagStatistics.mockReset();
+    getTagStatistics.mockResolvedValue({
+      tag_count: 0,
+      tagged_track_count: 0,
+      untagged_track_count: 0,
+      assignment_count: 0,
+      average_tags_per_tagged_track: 0,
+      most_used_tag: null,
+    });
     createTag.mockReset();
     deleteTag.mockReset();
     getPreferencesState().confirmDeletions = true;
@@ -39,6 +50,26 @@ describe('TagListView', () => {
     });
     expect(screen.queryByText('Rock')).toBeNull();
     expect(screen.getByText('Jazz')).toBeTruthy();
+  });
+  it('顯示不重複曲目與 Tag 關聯摘要', async () => {
+    getAllTags.mockResolvedValue([{ id: 1, name: 'Rock', track_count: 2 }]);
+    getTagStatistics.mockResolvedValue({
+      tag_count: 2,
+      tagged_track_count: 3,
+      untagged_track_count: 4,
+      assignment_count: 5,
+      average_tags_per_tagged_track: 1.666,
+      most_used_tag: { id: 1, name: 'Rock', track_count: 2 },
+    });
+
+    render(TagListView);
+
+    const summary = await screen.findByRole('region', { name: 'Tag 摘要統計' });
+    expect(within(summary).getByText('已標記曲目').nextElementSibling?.textContent).toBe('3');
+    expect(within(summary).getByText('未標記曲目').nextElementSibling?.textContent).toBe('4');
+    expect(within(summary).getByText('Tag 關聯').nextElementSibling?.textContent).toBe('5');
+    expect(within(summary).getByText('平均 Tag 數').nextElementSibling?.textContent).toBe('1.7');
+    expect(within(summary).getByText('Rock · 2 首')).toBeTruthy();
   });
   it('creates a trimmed tag and reloads the list', async () => {
     getAllTags.mockResolvedValue([]);

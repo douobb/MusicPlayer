@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { TagAssignment, TagSummary, Track } from '$lib/types';
+import type { TagAssignment, TagStatistics, TagSummary, Track } from '$lib/types';
 
 export async function createTag(name: string): Promise<TagSummary> {
   return invoke('create_tag', { name });
@@ -23,6 +23,10 @@ export async function mergeTags(sourceTagId: number, targetTagId: number): Promi
 
 export async function getAllTags(): Promise<TagSummary[]> {
   return invoke('get_all_tags');
+}
+
+export async function getTagStatistics(): Promise<TagStatistics> {
+  return invoke('get_tag_statistics');
 }
 
 export async function getTagsForTrack(trackId: number): Promise<TagSummary[]> {

@@ -82,3 +82,40 @@ jobs:
       - name: Cargo test
         run: cargo test
         working-directory: src-tauri
+
+  windows-test:
+    name: Windows tests
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Svelte & TypeScript type check
+        run: npm run check
+
+      - name: Vitest
+        run: npm run test
+
+      - name: Cargo test
+        run: cargo test --locked
+        working-directory: src-tauri
+
+      - name: Windows frontend build
+        run: npm run build

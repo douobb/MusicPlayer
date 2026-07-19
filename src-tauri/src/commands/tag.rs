@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::DbState;
 use crate::error::AppError;
-use crate::models::tag::{TagAssignment, TagSummary};
+use crate::models::tag::{TagAssignment, TagStatistics, TagSummary};
 use crate::models::track::Track;
 use crate::storage::tag_repo;
 
@@ -43,6 +43,12 @@ pub fn merge_tags(
 pub fn get_all_tags(db: State<DbState>) -> Result<Vec<TagSummary>, AppError> {
     let conn = db.0.lock().map_err(|_| AppError::LockPoisoned)?;
     tag_repo::get_all_tags(&conn)
+}
+
+#[tauri::command]
+pub fn get_tag_statistics(db: State<DbState>) -> Result<TagStatistics, AppError> {
+    let conn = db.0.lock().map_err(|_| AppError::LockPoisoned)?;
+    tag_repo::get_tag_statistics(&conn)
 }
 
 #[tauri::command]

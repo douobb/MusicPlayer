@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 
 use crate::error::AppError;
-use crate::models::tag::{TagAssignment, TagSummary};
+use crate::models::tag::{TagAssignment, TagStatistics, TagSummary};
 use crate::models::track::Track;
 use crate::storage::library_repo::{TRACK_COLUMNS, hydrate_tracks, row_to_track};
 
@@ -122,6 +122,60 @@ pub fn get_all_tags(conn: &Connection) -> Result<Vec<TagSummary>, AppError> {
     })?
     .collect::<Result<Vec<_>, _>>()
     .map_err(Into::into)
+}
+
+pub fn get_tag_statistics(conn: &Connection) -> Result<TagStatistics, AppError> {
+    let (tag_count, tagged_track_count, untagged_track_count, assignment_count) = conn.query_row(
+        "SELECT
+            (SELECT COUNT(*) FROM tags),
+            (SELECT COUNT(DISTINCT track_id) FROM track_tags),
+            (SELECT COUNT(*) FROM tracks t
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM track_tags tt WHERE tt.track_id = t.id
+             )),
+            (SELECT COUNT(*) FROM track_tags)",
+        [],
+        |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, i64>(2)?,
+                row.get::<_, i64>(3)?,
+            ))
+        },
+    )?;
+    let most_used_tag = conn
+        .query_row(
+            "SELECT t.id, t.name, COUNT(tt.track_id) AS track_count
+             FROM tags t
+             INNER JOIN track_tags tt ON tt.tag_id = t.id
+             GROUP BY t.id, t.name
+             ORDER BY track_count DESC, t.normalized_name
+             LIMIT 1",
+            [],
+            |row| {
+                Ok(TagSummary {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    track_count: row.get(2)?,
+                })
+            },
+        )
+        .optional()?;
+    let average_tags_per_tagged_track = if tagged_track_count == 0 {
+        0.0
+    } else {
+        assignment_count as f64 / tagged_track_count as f64
+    };
+
+    Ok(TagStatistics {
+        tag_count,
+        tagged_track_count,
+        untagged_track_count,
+        assignment_count,
+        average_tags_per_tagged_track,
+        most_used_tag,
+    })
 }
 
 pub fn get_tags_for_track(conn: &Connection, track_id: i64) -> Result<Vec<TagSummary>, AppError> {

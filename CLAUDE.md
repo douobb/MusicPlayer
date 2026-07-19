@@ -44,7 +44,7 @@ npm run check                # svelte-check + tsc
 ### 建置
 
 ```bash
-npm run tauri build          # 正式建置（輸出 deb/AppImage/rpm 至 src-tauri/target/release/bundle/）
+npm run tauri build          # 正式建置（輸出目前平台的安裝包至 src-tauri/target/release/bundle/）
 ```
 
 ## 架構
@@ -55,22 +55,22 @@ Frontend (Svelte 5)  ──IPC (invoke/listen)──  Backend (Rust/Tauri 2)
 
 **前端**（`src/`）：
 
-- `lib/api/` — Tauri IPC 封裝（`playback.ts`、`library.ts`、`playlist.ts`）
+- `lib/api/` — Tauri IPC 封裝（播放、媒體庫、播放清單與 Tag）
 - `lib/state/` — Svelte 5 runes 響應式狀態（透過 `getPlayerState()` 等取得單例）
 - `lib/logic/` — 抽離的純函式，便於測試（播放動作、鍵盤快捷鍵、排序、選取、虛擬捲動、格式化）
-- `lib/components/` — 依功能分組的 UI 元件（Player/、Library/、Browse/、Playlist/、Sidebar/、Settings/）
+- `lib/components/` — 依功能分組的 UI 元件（Player/、Library/、Browse/、Tags/、Playlist/、Sidebar/、Settings/ 與 Common/）
 - `lib/types/index.ts` — 所有 TypeScript 介面（Track、Playlist 等）
 - `lib/__mocks__/` — 測試用 Tauri/dialog mock
 - 路徑別名：`$lib` → `src/lib`
 
 **後端**（`src-tauri/src/`）：
 
-- `commands/` — Tauri command handler（playback、library、playlist）
-- `storage/` — Repository 模式：`library_repo.rs`（Track CRUD）、`playlist_repo.rs`（Playlist CRUD）、`db.rs`（schema + migrations）
+- `commands/` — Tauri command handler（playback、library、playlist、tag）
+- `storage/` — Repository 模式：曲目、播放清單、Tag、媒體庫資料夾與 schema
 - `audio/player.rs` — rodio sink 封裝，支援無縫播放（pre-decode + 排入同一 sink）
 - `scanner/` — `folder_scanner.rs`（walkdir 掃描）、`watcher.rs`（notify 即時監控）
 - `metadata/` — `reader.rs`（lofty 讀取）、`writer.rs`（標籤寫入）
-- `models/` — Serde 結構體：Track、Playlist、PlayerState、ArtistSummary、AlbumSummary
+- `models/` — Serde 結構體：Track、Playlist、PlayerState、Artist、Tag 與 LibraryFolder
 - `error.rs` — `AppError` 列舉（thiserror）
 - `tray.rs` — 系統匣整合
 - `lib.rs` — 應用程式初始化：DB 設定、音訊播放器、資料夾監控、系統匣、播放器輪詢執行緒
